@@ -6,7 +6,7 @@ Pattern Locker Library for android
 
 
 # How TO APPLY
-### ※This version was not clean up to ease of applying
+### ※This version was not cleaned up to ease of applying
 
 ## 1. In XML
 ```
@@ -42,6 +42,17 @@ Pattern Locker Library for android
 
 ```
 //patternLockView = PatternLockView(context) //for initiate view in code
+
+//setting attributes in code
+patternLockView.useVibratorIfAvaliable = false
+        patternLockView.useTrajectoryLineShadow = false
+        patternLockView.shouldShowTrajectoryLines = false
+        patternLockView.setLockTypes(PatternLockView.LockType.SQUARE_3X3,invalidateView = true)
+        patternLockView.clickingJudgementPaddingRadius = 30f//dimension size(e.g. pixel size)
+        patternLockView.editMode = true // not using currently
+        patternLockView.onTaskPatternListener = ...
+
+//finish setting attributes in code
 val patternDataContoller = PatternLockerDataController.PatternLockerDataControllerFactory.getInstance(context = this).build()
         patternDataContoller.onCheckingSelectedPointsListener = object:PatternLockerDataController.OnCheckingSelectedPointsListener{
             override fun onError(errorID: Int) {
