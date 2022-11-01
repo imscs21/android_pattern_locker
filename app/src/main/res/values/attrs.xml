@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <declare-styleable name="PatternLockView">
+        <attr name="indicatorColor" format="color|reference" />
+        <attr name="indicatorRadius" format="dimension|reference"/>
+        <attr name="showTrajectoryLines" format="boolean|reference"/>
+        <attr name="useVibratorIfAvailable" format="boolean|reference" />
+        <attr name="trajectoryLineColor" format="color|reference" />
+        <attr name="trajectoryLineThickness" format="dimension|reference" />
+        <attr name="useTrajectoryLineShadow" format="boolean|reference"/>
+        <attr name="recommendedClickingJudgementAreaPaddingRadius" format="dimension|reference" />
+        <attr name="patternType">
+            <flag name="square_3x3" value="1"/>
+            <flag name="square_3x3_with_check_pattern" value="2"/>
+            <flag name="square_4x4" value="3"/>
+            <flag name="square_5x5" value="4"/>
+            <flag name="square_6x6" value="5"/>
+            <flag name="square_7x7" value="6"/>
+            <flag name="pentagon_shape_default" value="7"/>
+            <flag name="pentagon_shape_with_high_density" value="8"/>
+            <flag name="hexagon_shape_default" value="9"/>
+            <flag name="hexagon_shape_with_high_density" value="10"/>
+        </attr>
+    </declare-styleable>
+</resources>
