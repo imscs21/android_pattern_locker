@@ -31,6 +31,9 @@
         app:indicatorRadius="6dp"
         app:trajectoryLineColor="@color/teal_200"
         app:trajectoryLineThickness="5dp"
+        app:showTrajectoryLines="true"
+        app:useVibratorIfAvailable="true"
+        app:useTrajectoryLineShadow="false"
         app:patternType="square_3x3" />
 
     <androidx.appcompat.widget.LinearLayoutCompat

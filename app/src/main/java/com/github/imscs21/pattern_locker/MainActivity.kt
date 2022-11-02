@@ -13,16 +13,24 @@ import androidx.appcompat.widget.AppCompatSpinner
 import com.github.imscs21.pattern_locker.views.PatternLockView
 import com.github.imscs21.pattern_locker.views.PatternLockerDataController
 import com.github.imscs21.pattern_locker.views.PointItem
+import com.github.imscs21.pattern_locker.views.SelectedPointItem
 import com.google.android.material.switchmaterial.SwitchMaterial
 
 class MainActivity : AppCompatActivity() {
     protected lateinit var patternLockView: PatternLockView
+
     protected lateinit var patternSwitcher:AppCompatSpinner
+
     protected lateinit var resetPatternButton:AppCompatButton
+
     protected lateinit var taskPatternButton:AppCompatButton
+
     protected lateinit var editModeButton:SwitchMaterial
-    protected lateinit var patternDataContoller:PatternLockerDataController
+
+    protected lateinit var patternDataContoller:PatternLockerDataController<String>
+
     protected var listAdapterIndex:Int = -1
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
@@ -43,7 +51,7 @@ class MainActivity : AppCompatActivity() {
                 }
             }
         }
-        patternDataContoller = PatternLockerDataController.PatternLockerDataControllerFactory.getInstance(context = this).build()
+        patternDataContoller = PatternLockerDataController.PatternLockerDataControllerFactory.getInstance().build<String>(this,PatternLockerDataController.SimpleDataStorageBehavior(this))
         patternDataContoller.onCheckingSelectedPointsListener = object:PatternLockerDataController.OnCheckingSelectedPointsListener{
             override fun onError(errorID: Int) {
                 patternLockView.resetSelectedPoints(force = true)
@@ -52,7 +60,7 @@ class MainActivity : AppCompatActivity() {
             override fun onSuccess(result: Boolean) {
                 runOnUiThread {
                     Toast.makeText(applicationContext,"check result is ${result}",Toast.LENGTH_SHORT).show()
-                    patternLockView.resetSelectedPoints(force = true)
+                    patternLockView.resetSelectedPoints(force = true,invalidateView = true)
                 }
             }
         }
@@ -94,10 +102,10 @@ class MainActivity : AppCompatActivity() {
             override fun onFinishedPatternSelected(
                 editModeFromView: Boolean,
                 lockType: PatternLockView.LockType,
-                selectedPoints: ArrayList<PointItem>
+                selectedPoints: ArrayList<SelectedPointItem>
             ) {
                 if(editModeButton.isChecked){
-
+                    //in pattern edit mode
                 }
                 else{
                     patternDataContoller.requestToCheckSelectedPoints(lockType, selectedPoints)
@@ -105,6 +113,7 @@ class MainActivity : AppCompatActivity() {
             }
 
         }
+       
         val patternList = listOf<String>(
             "square 3x3",
             "square 3x3 check",

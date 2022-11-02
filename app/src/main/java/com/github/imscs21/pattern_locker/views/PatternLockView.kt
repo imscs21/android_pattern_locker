@@ -21,10 +21,13 @@ import kotlin.math.max
 import kotlin.math.sin
 
 class PatternLockView : View ,View.OnTouchListener {
+
+
     public interface OnTaskPatternListener{
         public fun onNothingSelected()
-        public fun onFinishedPatternSelected(editModeFromView:Boolean,lockType: LockType,selectedPoints:ArrayList<PointItem>)
+        public fun onFinishedPatternSelected(editModeFromView:Boolean,lockType: LockType,selectedPoints:ArrayList<SelectedPointItem>)
     }
+
 
     public enum class LockType(val value:String,val intValue:Int){
         SQUARE_3X3("SQUARE_3X3",1),
@@ -39,6 +42,7 @@ class PatternLockView : View ,View.OnTouchListener {
         HEXAGON_HIGH_DENSITY("HEXAGON_SHAPE_HD",10)
     }
 
+    
     protected var pointRadius = 0f
 
     protected lateinit var lockType:LockType
@@ -54,9 +58,9 @@ class PatternLockView : View ,View.OnTouchListener {
 
     protected var MAX_POINT_RADIUS:Float = 110f
 
-    protected lateinit var points:ArrayList<Pair<Int,Pair<Float,Float>>>
+    protected lateinit var points:ArrayList<PointItem>
 
-    protected lateinit var selectedPoints:ArrayList<Pair<Int,Pair<Float,Float>>>
+    protected lateinit var selectedPoints:ArrayList<SelectedPointItem>
 
     public var onTaskPatternListener:OnTaskPatternListener? = null
 
@@ -66,11 +70,17 @@ class PatternLockView : View ,View.OnTouchListener {
 
     protected lateinit var pointPaint:Paint
 
+    protected lateinit var secondHandler:Handler
+
     protected var pointColor:Int = Color.CYAN
 
     protected var vibrationUtil: VibrationUtil? = null
 
     public var clickingJudgementPaddingRadius:Float = 5f
+
+    public var editMode:Boolean = false
+
+    public var useVibratorIfAvaliable:Boolean = true
 
     public var useTrajectoryLineShadow:Boolean = false
         set(value)  {
@@ -89,6 +99,7 @@ class PatternLockView : View ,View.OnTouchListener {
 
             }
         }
+
     protected var innerViewGravity: Int = Gravity.CENTER
 
     public var shouldShowTrajectoryLines:Boolean = true
@@ -103,10 +114,6 @@ class PatternLockView : View ,View.OnTouchListener {
         }
     }
 
-    public var editMode:Boolean = false
-
-    public var useVibratorIfAvaliable:Boolean = true
-
     constructor(context:Context):super(context){
         initVars(context)
     }
@@ -119,10 +126,11 @@ class PatternLockView : View ,View.OnTouchListener {
         setAttrs(context, attrs, defStyle)
     }
 
-
     public fun resetSelectedPoints(force:Boolean = false ,invalidateView: Boolean = true):Boolean{
         if(editMode || force){
+
             selectedPoints.clear()
+            floatingPoint = null
             if(invalidateView) {
                 invalidate()
             }
@@ -130,17 +138,20 @@ class PatternLockView : View ,View.OnTouchListener {
         return editMode || force
     }
 
-
     public fun getLockTypes():LockType{
         return lockType
     }
 
-
-    public fun getSelectedPointss():ArrayList<PointItem>{
+    public fun getSelectedPointss():ArrayList<SelectedPointItem>{
         return selectedPoints
     }
-    
 
+    override fun onMeasure(widthMeasureSpec: Int, heightMeasureSpec: Int) {
+        super.onMeasure(widthMeasureSpec, heightMeasureSpec)
+
+    }
+
+    
     public fun setLockTypes(lockType:LockType,invalidateView:Boolean = true){
         if(this.lockType!=lockType){
             points.clear()
@@ -161,35 +172,31 @@ class PatternLockView : View ,View.OnTouchListener {
     protected fun initalizePointsAsSquare(canvas: Canvas,patternSize: Int){
         val height = canvas.height
         val width = canvas.width
+        val cx = width/2.0f
+        val cy = height/2.0f
         val commonSize = min(max(0,width- (paddingLeft + paddingRight)),max(height - (paddingTop + paddingBottom),0))
-        val fitCircleRadius = commonSize/(2.0f*patternSize)
         if(patternSize==-3){
             var index = 0
-            for (i in 0 until (-patternSize)*2 - 1) {
-                for (j in 0 until (-patternSize)*2 - 1) {
-                    if(index%2==1){
+            val fitCircleRadius:Float = (commonSize/(patternSize.toFloat()))
+            val practicalCircleRadius = (commonSize/(((-patternSize)*2-1).toFloat()))
+
+            for(i in 0 until (-patternSize)*2 - 1){
+                for(j in 0 until (-patternSize)*2 - 1){
+                    if(j%2==0 && i%2==1 || j%2==1 && i%2==0){
                         continue
                     }
-                    val px = min(fitCircleRadius+(2*fitCircleRadius)*j + paddingLeft,width-paddingRight+0.0f)
-                    val py = min((fitCircleRadius+(2*fitCircleRadius)*i) + paddingTop,height - paddingBottom+0.0f)
-                    //canvas.drawCircle(px,py,fitCircleRadius,tmpPaint)
-                    val core_area_radius = fitCircleRadius*0.2f
-                    //canvas.drawCircle(px,py,core_area_radius,tmpPaint2)
-                    val core_area = RectF(px-core_area_radius,py-core_area_radius,px+core_area_radius,py+core_area_radius)
+                    val px = (cx-commonSize/2.0f+practicalCircleRadius/2.0f)+practicalCircleRadius*i.toFloat()
+                    val py = (cy-commonSize/2.0f+practicalCircleRadius/2.0f)+practicalCircleRadius*j.toFloat()//min((fitCircleRadius+(2*fitCircleRadius)*i) + paddingTop,height - paddingBottom+0.0f)
                     points.add(Pair<Int,Pair<Float,Float>>(++index,Pair<Float,Float>(px,py)))
                 }
             }
         }else {
+            val fitCircleRadius:Float = (commonSize/(patternSize.toFloat()))
             var index = 0
-            for (i in 0 until patternSize) {
-                for (j in 0 until patternSize) {
-                    val px = min(fitCircleRadius+(2*fitCircleRadius)*j + paddingLeft,width-paddingRight+0.0f)
-                    val py = min((fitCircleRadius+(2*fitCircleRadius)*i) + paddingTop,height - paddingBottom+0.0f)
-                    //canvas.drawCircle(px,py,fitCircleRadius,tmpPaint)
-                    val core_area_radius = fitCircleRadius*0.2f
-                    //canvas.drawCircle(px,py,core_area_radius,tmpPaint2)
-                    val core_area = RectF(px-core_area_radius,py-core_area_radius,px+core_area_radius,py+core_area_radius)
-                    //points.add(Pair<Int,RectF>(++index,core_area))
+            for(i in 0 until patternSize){
+                for(j in 0 until patternSize){
+                    val px = (cx-commonSize/2.0f+fitCircleRadius/2.0f)+fitCircleRadius*i.toFloat()
+                    val py = (cy-commonSize/2.0f+fitCircleRadius/2.0f)+fitCircleRadius*j.toFloat()//min((fitCircleRadius+(2*fitCircleRadius)*i) + paddingTop,height - paddingBottom+0.0f)
                     points.add(Pair<Int,Pair<Float,Float>>(++index,Pair<Float,Float>(px,py)))
                 }
             }
@@ -331,7 +338,7 @@ class PatternLockView : View ,View.OnTouchListener {
         setLockTypes(defaultLockType, invalidateView = false)
         points = ArrayList<Pair<Int,Pair<Float,Float>>>()
         points.clear()
-        selectedPoints = ArrayList<Pair<Int,Pair<Float,Float>>>()
+        selectedPoints = ArrayList<SelectedPointItem>()
         selectedPoints.clear()
         linePaint = Paint()
         linePaint.apply{
@@ -425,19 +432,19 @@ class PatternLockView : View ,View.OnTouchListener {
     }
 
     
-    protected fun drawLines(canvas: Canvas,points:ArrayList<Pair<Int,Pair<Float,Float>>>,with_lastline:Boolean = false,only_lastline:Boolean = false){
+    protected fun drawLines(canvas: Canvas,points:ArrayList<SelectedPointItem>,with_lastline:Boolean = false,only_lastline:Boolean = false){
         if(selectedPoints.size>0){
             //linePaint.color = Color.BLACK
             if(!only_lastline){
                 for(i in 1 until selectedPoints.size){
-                    val beforePoint = selectedPoints.get(i-1).second
-                    val curPoint = selectedPoints.get(i).second
+                    val beforePoint = selectedPoints.get(i-1).second.second
+                    val curPoint = selectedPoints.get(i).second.second
                     canvas.drawLine(beforePoint.first,beforePoint.second,curPoint.first,curPoint.second,linePaint)
                 }
             }
             if(with_lastline) {
                 floatingPoint?.let {
-                    val beforePoint = selectedPoints.get(selectedPoints.size - 1).second
+                    val beforePoint = selectedPoints.get(selectedPoints.size - 1).second.second
                     val curPoint = it
                     canvas.drawLine(
                         beforePoint.first,
@@ -471,7 +478,7 @@ class PatternLockView : View ,View.OnTouchListener {
     
     protected fun checkIndexNumberExists(index:Int):Boolean{
         for(item in selectedPoints){
-            if(index==item.first){
+            if(index==item.second.first){
                 return true
             }
         }
@@ -482,11 +489,15 @@ class PatternLockView : View ,View.OnTouchListener {
     override fun onTouch(v: View, event: MotionEvent): Boolean {
         val x = event.x
         val y = event.y
-        when( event.action){
+        //android.util.Log.e("onTouch",event.action.toString()+"  ")
+        when( event.actionMasked){
             MotionEvent.ACTION_DOWN , MotionEvent.ACTION_MOVE, MotionEvent.ACTION_HOVER_ENTER
-                ,MotionEvent.ACTION_HOVER_MOVE, MotionEvent.ACTION_SCROLL -> {
+                ,MotionEvent.ACTION_HOVER_MOVE, MotionEvent.ACTION_SCROLL,MotionEvent.ACTION_BUTTON_PRESS
+            , MotionEvent.ACTION_POINTER_DOWN
+            -> {
 
                 handler.post {
+                    val startSearchingTime = System.currentTimeMillis()
                     for (i in points.indices) {
                         val item = points[i]
                         val index_number = item.first
@@ -505,7 +516,7 @@ class PatternLockView : View ,View.OnTouchListener {
                                     vibrationUtil?.vibrateAsClick()
                                 }
                                 //last_touch_point_index = i
-                                selectedPoints.add(item)
+                                selectedPoints.add(SelectedPointItem(startSearchingTime,item))
                                 if (selectedPoints.size == 1) {
                                     //closeMonitorInputThread()
                                     //startMonitorInputThread()
@@ -515,6 +526,7 @@ class PatternLockView : View ,View.OnTouchListener {
                             break
                         }
                     }
+                    //invalidate()
                 }
                 if(selectedPoints.size>0){
                     floatingPoint = Pair<Float,Float>(x,y)
