@@ -41,6 +41,10 @@ class PatternLockView : View ,View.OnTouchListener {
         HEXAGON_DEFAULT("HEXAGON_SHAPE",9),
         HEXAGON_HIGH_DENSITY("HEXAGON_SHAPE_HD",10)
     }
+    public enum class SpacingTypeIfWrapContent(val intValue:Int){
+        TOTAL(1),
+        FIXED(2)
+    }
 
     
     protected var pointRadius = 0f
@@ -70,11 +74,15 @@ class PatternLockView : View ,View.OnTouchListener {
 
     protected lateinit var pointPaint:Paint
 
-    protected lateinit var secondHandler:Handler
+    protected lateinit var mainHandler:Handler
 
     protected var pointColor:Int = Color.CYAN
 
     protected var vibrationUtil: VibrationUtil? = null
+
+    protected var spacingTypeIfWrapContent:SpacingTypeIfWrapContent = SpacingTypeIfWrapContent.TOTAL
+
+    protected var spacingSizeIfWrapContent:Float = 100f
 
     public var clickingJudgementPaddingRadius:Float = 5f
 
@@ -99,7 +107,9 @@ class PatternLockView : View ,View.OnTouchListener {
 
             }
         }
-
+    
+    protected var shouldRecalculateSize = false
+    
     protected var innerViewGravity: Int = Gravity.CENTER
 
     public var shouldShowTrajectoryLines:Boolean = true
@@ -126,6 +136,32 @@ class PatternLockView : View ,View.OnTouchListener {
         setAttrs(context, attrs, defStyle)
     }
 
+    public fun setSpacingTypeIfWrapContent(spacingType:SpacingTypeIfWrapContent,spacingSize:Float,invalidateView: Boolean = true){
+        spacingSizeIfWrapContent = spacingSize
+        spacingTypeIfWrapContent = spacingType
+        if(shouldRecalculateSize){
+            mainHandler.post {
+                try{
+                    requestLayout()
+                }
+                catch(e:Exception){
+
+                }
+            }
+        }
+        if(invalidateView){
+            mainHandler.post {
+                try{
+                    invalidate()
+                }
+                catch(e:Exception){
+
+                }
+            }
+        }
+
+    }
+
     public fun resetSelectedPoints(force:Boolean = false ,invalidateView: Boolean = true):Boolean{
         if(editMode || force){
 
@@ -148,18 +184,93 @@ class PatternLockView : View ,View.OnTouchListener {
 
     override fun onMeasure(widthMeasureSpec: Int, heightMeasureSpec: Int) {
         super.onMeasure(widthMeasureSpec, heightMeasureSpec)
+        val widthMode = MeasureSpec.getMode(widthMeasureSpec)
+        val widthSize = MeasureSpec.getSize(widthMeasureSpec)
+        val heightMode = MeasureSpec.getMode(heightMeasureSpec)
+        val heightSize = MeasureSpec.getSize(heightMeasureSpec)
+        var mHeight = heightSize
+        var mWidth = widthSize
+        val numOfPoints = when(lockType){
 
+            LockType.SQUARE_3X3_WITH_CHECKER_PATTERN ->{
+                5
+            }
+            LockType.SQUARE_4X4 ->{
+                4
+            }
+            LockType.SQUARE_5X5->{
+                5
+            }
+            LockType.SQUARE_6X6 ->{
+                6
+            }
+            LockType.SQUARE_7X7 ->{
+                7
+            }
+            LockType.HEXAGON_DEFAULT->{
+                6
+            }
+            LockType.HEXAGON_HIGH_DENSITY ->{
+                6
+            }
+            LockType.PENTAGON_DEFAULT ->{
+                6
+            }
+            LockType.PENTAGON_HIGH_DENSITY->{
+                6
+            }
+            else->{
+                3
+            }
+        }
+        val minSpacing = spacingSizeIfWrapContent.let{if(spacingTypeIfWrapContent==SpacingTypeIfWrapContent.TOTAL){ (it)/numOfPoints}else{it}}
+        shouldRecalculateSize = (widthMode==MeasureSpec.AT_MOST||heightMode==MeasureSpec.AT_MOST)
+        when(widthMode){
+            MeasureSpec.AT_MOST ->{
+                mWidth = ((paddingLeft+paddingRight)+ ((2*(pointRadius+clickingJudgementPaddingRadius)+minSpacing)*(1+numOfPoints))).toInt()
+
+            }
+            MeasureSpec.EXACTLY->{
+
+            }
+        }
+        when(heightMode){
+            MeasureSpec.AT_MOST ->{
+                mHeight = ((paddingTop+paddingBottom)+ ((2*(pointRadius+clickingJudgementPaddingRadius)+minSpacing)*(1+numOfPoints))).toInt()
+            }
+            MeasureSpec.EXACTLY->{
+
+            }
+        }
+        setMeasuredDimension(mWidth,mHeight)
     }
 
     
     public fun setLockTypes(lockType:LockType,invalidateView:Boolean = true){
+        var flag = false
         if(this.lockType!=lockType){
             points.clear()
+            flag = true
         }
         this.lockType = lockType
+        if(flag&&shouldRecalculateSize){
+            mainHandler.post {
+                try{
+                    requestLayout()
+                }catch(e:Exception){
 
+                }
+            }
+
+        }
         if(invalidateView){
-            invalidate()
+            mainHandler.post {
+                try{
+                    invalidate()
+                }catch(e:Exception){
+
+                }
+            }
         }
     }
 
@@ -328,11 +439,12 @@ class PatternLockView : View ,View.OnTouchListener {
         }
         useVibratorIfAvaliable = true
         shouldShowTrajectoryLines = true
+        mainHandler = Handler(Looper.getMainLooper())
         //setLockTypes(Lock)
         val defaultLockType = LockType.SQUARE_3X3
         this.lockType = defaultLockType
         dip1 = TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_DIP,1f,context.resources.displayMetrics)
-
+        setSpacingTypeIfWrapContent(SpacingTypeIfWrapContent.TOTAL,100*dip1,invalidateView = false)
         pointRadius = dip1*11
         clickingJudgementPaddingRadius = dip1*5
         setLockTypes(defaultLockType, invalidateView = false)
@@ -410,6 +522,8 @@ class PatternLockView : View ,View.OnTouchListener {
         var attr_trajectory_line_color = attributes.getColor(R.styleable.PatternLockView_trajectoryLineColor,linePaint.color)
         linePaint.color = attr_trajectory_line_color
 
+
+
         val attr_pattern_type = attributes.getInt(R.styleable.PatternLockView_patternType,lockType.intValue)
         for(lt in LockType.values()){
             if(attr_pattern_type==lt.intValue){
@@ -418,6 +532,15 @@ class PatternLockView : View ,View.OnTouchListener {
             }
         }
 
+        val attr_spacing_size_if_wrap_content = attributes.getDimension(R.styleable.PatternLockView_spacingSizeIfWrapContent,spacingSizeIfWrapContent)
+
+        val attr_spacing_type_if_wrap_content = attributes.getInt(R.styleable.PatternLockView_spacingTypeIfWrapContent,spacingTypeIfWrapContent.intValue)
+        for(lt in SpacingTypeIfWrapContent.values()){
+            if(attr_spacing_type_if_wrap_content==lt.intValue){
+                setSpacingTypeIfWrapContent(lt,attr_spacing_size_if_wrap_content)
+                break
+            }
+        }
 
     }
 

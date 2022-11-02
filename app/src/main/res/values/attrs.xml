@@ -1,6 +1,12 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <declare-styleable name="PatternLockView">
+        <attr name="spacingSizeIfWrapContent" format="dimension|reference"/>
+        <attr name="spacingTypeIfWrapContent" >
+            <flag name="total" value="1"/>
+            <flag name="fixed" value="2"/>
+        </attr>
+
         <attr name="indicatorColor" format="color|reference" />
         <attr name="indicatorRadius" format="dimension|reference"/>
         <attr name="showTrajectoryLines" format="boolean|reference"/>
@@ -9,6 +15,7 @@
         <attr name="trajectoryLineThickness" format="dimension|reference" />
         <attr name="useTrajectoryLineShadow" format="boolean|reference"/>
         <attr name="recommendedClickingJudgementAreaPaddingRadius" format="dimension|reference" />
+
         <attr name="patternType">
             <flag name="square_3x3" value="1"/>
             <flag name="square_3x3_with_check_pattern" value="2"/>
