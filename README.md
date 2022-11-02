@@ -139,8 +139,9 @@ val dataController = dataControllerFactory.build(context,dataStorageBehavior)
 This is pre-defined StorageBehavior.
 But There are weak points due to md5 hashing. 
 ```
-val patternDataContoller = PatternLockerDataController.PatternLockerDataControllerFactory.getInstance().build<String>(this,PatternLockerDataController.SimpleDataStorageBehavior(this))
-
+val simpleBehavior = PatternLockerDataController.SimpleDataStorageBehavior(this)
+val dataControllerFactory = PatternLockerDataController.PatternLockerDataControllerFactory.getInstance()
+val patternDataContoller = dataControllerFactory.build<String>(this,simpleBehavior)
 ```
 
 ### 3. Reset drawn pattern
