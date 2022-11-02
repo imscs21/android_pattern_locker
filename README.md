@@ -15,6 +15,8 @@ Pattern Locker Library for android
         android:layout_height="match_parent"
         android:padding="30dp"
         app:recommendedClickingJudgementAreaPaddingRadius="9dp"
+        app:spacingSizeIfWrapContent="100dp"
+        app:spacingTypeIfWrapContent="total"
         app:indicatorColor="#80ff80"
         app:indicatorRadius="6dp"
         app:trajectoryLineColor="#ff8080"
@@ -27,7 +29,7 @@ Pattern Locker Library for android
 * xml attributes
     1. (supported) pattern types
         * square_3x3
-        * ~~square_3x3_with_check_pattern~~
+        * square_3x3_with_check_pattern
         * square_4x4
         * square_5x5
         * square_6x6
@@ -36,7 +38,10 @@ Pattern Locker Library for android
         * ~~pentagon_shape_with_high_density~~
         * hexagon_shape_default
         * ~~hexagon_shape_with_high_density~~
-    2. etc
+    2. spacingTypeIfWrapContent
+       * total
+       * fixed 
+    3. etc
 
 ## 2. In Kotlin
 
@@ -45,15 +50,16 @@ Pattern Locker Library for android
 
 //setting attributes in code
 patternLockView.useVibratorIfAvaliable = false
-        patternLockView.useTrajectoryLineShadow = false
-        patternLockView.shouldShowTrajectoryLines = false
-        patternLockView.setLockTypes(PatternLockView.LockType.SQUARE_3X3,invalidateView = true)
-        patternLockView.clickingJudgementPaddingRadius = 30f//dimension size(e.g. pixel size)
-        patternLockView.editMode = true // not using currently
-        patternLockView.onTaskPatternListener = ...
+patternLockView.useTrajectoryLineShadow = false
+patternLockView.shouldShowTrajectoryLines = false
+patternLockView.setLockTypes(PatternLockView.LockType.SQUARE_3X3,invalidateView = true)
+patternLockView.clickingJudgementPaddingRadius = 30f//dimension size(e.g. pixel size)
+patternLockView.editMode = true // not using currently
+patternLockView.onTaskPatternListener = ...
 
 //finish setting attributes in code
-val patternDataContoller = PatternLockerDataController.PatternLockerDataControllerFactory.getInstance(context = this).build()
+
+val patternDataContoller = PatternLockerDataController.PatternLockerDataControllerFactory.getInstance().build<String>(this,PatternLockerDataController.SimpleDataStorageBehavior(this))
         patternDataContoller.onCheckingSelectedPointsListener = object:PatternLockerDataController.OnCheckingSelectedPointsListener{
             override fun onError(errorID: Int) {
                 patternLockView.resetSelectedPoints(force = true)
@@ -74,7 +80,7 @@ patternLockView.onTaskPatternListener = object:PatternLockView.OnTaskPatternList
             override fun onFinishedPatternSelected(
                 editModeFromView: Boolean,
                 lockType: PatternLockView.LockType,
-                selectedPoints: ArrayList<PointItem>
+                selectedPoints: ArrayList<SelectedPointItem>
             ) {
                 if(editModeButton.isChecked){
                     //in pattern edit mode
@@ -85,6 +91,56 @@ patternLockView.onTaskPatternListener = object:PatternLockView.OnTaskPatternList
             }
 
         }
+```
+
+#### 2.1. Implement your own pattern storage behavior
+```
+val dataControllerFactory = PatternLockerDataController.PatternLockerDataControllerFactory.getInstance()
+
+val dataStorageBehavior : PatternLockerDataController.DataStorageBehavior<Any> = object:PatternLockerDataController.DataStorageBehavior<Any>{
+    override val innerValue: MutableLiveData<Any>
+        get() = TODO("Not yet implemented")
+
+    override fun selectValue(): Any? {
+        TODO("Not yet implemented")
+    }
+
+    override fun savePattern(
+        lockType: PatternLockView.LockType,
+        selectedPoints: ArrayList<SelectedPointItem>
+    ): Boolean {
+        TODO("Not yet implemented")
+    }
+
+    override fun loadPattern(): Any? {
+        TODO("Not yet implemented")
+    }
+
+    override fun checkPattern(
+        value: Any?,
+        lockType: PatternLockView.LockType,
+        selectedPoints: ArrayList<SelectedPointItem>
+    ): Boolean {
+        TODO("Not yet implemented")
+    }
+
+    override fun resetPattern(): Boolean {
+        TODO("Not yet implemented")
+    }
+
+}
+
+val dataController = dataControllerFactory.build(context,dataStorageBehavior)
+...
+
+```
+
+#### 2.2. Simple Data Storage Behavior 
+This is pre-defined StorageBehavior.
+But There are weak points due to md5 hashing. 
+```
+val patternDataContoller = PatternLockerDataController.PatternLockerDataControllerFactory.getInstance().build<String>(this,PatternLockerDataController.SimpleDataStorageBehavior(this))
+
 ```
 
 ### 3. Reset drawn pattern
