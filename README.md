@@ -8,9 +8,16 @@ Pattern Locker Library for android
 # How TO APPLY
 ### ※This version was not cleaned up to ease of applying
 
-## 1. In XML
+## 1. Import this lib to your project
++ [See This for current version after download this lib](https://developer.android.com/studio/projects/android-library?hl=ko)
+
+
+
+## 2. In XML
 ```
 <com.github.imscs21.pattern_locker.views.PatternLockView
+        xmlns:android="http://schemas.android.com/apk/res/android"
+        xmlns:app="http://schemas.android.com/apk/res-auto"
         android:layout_width="match_parent"
         android:layout_height="match_parent"
         android:padding="30dp"
@@ -43,7 +50,7 @@ Pattern Locker Library for android
        * fixed 
     3. etc
 
-## 2. In Kotlin
+## 3. In Kotlin
 
 ```
 //patternLockView = PatternLockView(context) //for initiate view in code
@@ -78,22 +85,23 @@ patternLockView.onTaskPatternListener = object:PatternLockView.OnTaskPatternList
             }
 
             override fun onFinishedPatternSelected(
+                view:PatternLockView,
                 editModeFromView: Boolean,
                 lockType: PatternLockView.LockType,
-                selectedPoints: ArrayList<SelectedPointItem>
+                copiedSelectedPoints: ArrayList<SelectedPointItem>
             ) {
                 if(editModeButton.isChecked){
                     //in pattern edit mode
                 }
                 else{
-                    patternDataContoller.requestToCheckSelectedPoints(lockType, selectedPoints)
+                    patternDataContoller.requestToCheckSelectedPoints(lockType, copiedSelectedPoints)
                 }
             }
 
         }
 ```
 
-#### 2.1. Implement your own pattern storage behavior
+#### 3.1. Implement your own pattern storage behavior
 ```
 val dataControllerFactory = PatternLockerDataController.PatternLockerDataControllerFactory.getInstance()
 
@@ -135,7 +143,7 @@ val dataController = dataControllerFactory.build(context,dataStorageBehavior)
 
 ```
 
-#### 2.2. Simple Data Storage Behavior 
+#### 3.2. Simple Data Storage Behavior 
 This is pre-defined StorageBehavior.
 But There are weak points due to md5 hashing. 
 ```
@@ -144,12 +152,12 @@ val dataControllerFactory = PatternLockerDataController.PatternLockerDataControl
 val patternDataContoller = dataControllerFactory.build<String>(this,simpleBehavior)
 ```
 
-### 3. Reset drawn pattern
+### 4. Reset drawn pattern
 ```
 patternLockView.resetSelectedPoints(force = true,invalidateView = true)
 ```
 
-### 4. Reset stored pattern info
+### 5. Reset stored pattern info
 ```
 patternDataContoller?.resetPattern()
 ```
