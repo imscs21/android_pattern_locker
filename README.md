@@ -9,7 +9,7 @@ Pattern Locker Library for android
 ### ※This version was not cleaned up to ease of applying
 
 ## 1. Import this lib to your project
-+ [See This for current version after download this lib](https://developer.android.com/studio/projects/android-library?hl=ko)
++ [See This for current version after downloading this lib](https://developer.android.com/studio/projects/android-library?hl=ko)
 
 
 
