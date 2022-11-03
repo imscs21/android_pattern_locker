@@ -1,4 +1,4 @@
-package com.github.imscs21.pattern_locker
+package com.github.imscs21.pattern_locker_test
 
 import android.content.Context
 import androidx.appcompat.app.AppCompatActivity
@@ -10,6 +10,7 @@ import android.widget.ArrayAdapter
 import android.widget.Toast
 import androidx.appcompat.widget.AppCompatButton
 import androidx.appcompat.widget.AppCompatSpinner
+import com.github.imscs21.pattern_locker_test.R
 import com.github.imscs21.pattern_locker.views.PatternLockView
 import com.github.imscs21.pattern_locker.views.PatternLockerDataController
 import com.github.imscs21.pattern_locker.views.SelectedPointItem
@@ -79,7 +80,7 @@ class MainActivity : AppCompatActivity() {
             val editMode = editModeButton.isChecked
             if(editMode){
                 val result =
-                patternDataContoller.savePattern(patternLockView.getLockTypes(),patternLockView.getSelectedPointss())
+                    patternDataContoller.savePattern(patternLockView.getLockTypes(),patternLockView.getSelectedPointss())
 
                 Toast.makeText(applicationContext,"pattern save state:${result}",Toast.LENGTH_SHORT).show()
                 patternLockView.resetSelectedPoints(force = true)
@@ -113,7 +114,7 @@ class MainActivity : AppCompatActivity() {
             }
 
         }
-       
+
         val patternList = listOf<String>(
             "square 3x3",
             "square 3x3 checker",
@@ -138,32 +139,32 @@ class MainActivity : AppCompatActivity() {
                     id: Long
                 ) {
 
-                   when(position){
-                       1->{
-                           patternLockView.setLockTypes(PatternLockView.LockType.SQUARE_3X3_WITH_CHECKER_PATTERN)
-                       }
-                       2->{
-                           patternLockView.setLockTypes(PatternLockView.LockType.SQUARE_4X4)
-                       }
-                       3->{
-                           patternLockView.setLockTypes(PatternLockView.LockType.SQUARE_5X5)
-                       }
-                       4->{
-                           patternLockView.setLockTypes(PatternLockView.LockType.SQUARE_6X6)
-                       }
-                       5->{
-                           patternLockView.setLockTypes(PatternLockView.LockType.SQUARE_7X7)
-                       }
-                       6->{
-                           patternLockView.setLockTypes(PatternLockView.LockType.PENTAGON_DEFAULT)
-                       }
-                       7->{
-                           patternLockView.setLockTypes(PatternLockView.LockType.HEXAGON_DEFAULT)
-                       }
-                       else->{
-                           patternLockView.setLockTypes(PatternLockView.LockType.SQUARE_3X3)
-                       }
-                   }
+                    when(position){
+                        1->{
+                            patternLockView.setLockTypes(PatternLockView.LockType.SQUARE_3X3_WITH_CHECKER_PATTERN)
+                        }
+                        2->{
+                            patternLockView.setLockTypes(PatternLockView.LockType.SQUARE_4X4)
+                        }
+                        3->{
+                            patternLockView.setLockTypes(PatternLockView.LockType.SQUARE_5X5)
+                        }
+                        4->{
+                            patternLockView.setLockTypes(PatternLockView.LockType.SQUARE_6X6)
+                        }
+                        5->{
+                            patternLockView.setLockTypes(PatternLockView.LockType.SQUARE_7X7)
+                        }
+                        6->{
+                            patternLockView.setLockTypes(PatternLockView.LockType.PENTAGON_DEFAULT)
+                        }
+                        7->{
+                            patternLockView.setLockTypes(PatternLockView.LockType.HEXAGON_DEFAULT)
+                        }
+                        else->{
+                            patternLockView.setLockTypes(PatternLockView.LockType.SQUARE_3X3)
+                        }
+                    }
                     //if(0<=position&&position<lockTypes.size) {patternLockView.setLockTypes(lockTypes.get(position))}
                     if(listAdapterIndex!=-1 && listAdapterIndex!=position) {
                         resetPatternMethodForOnlyExample()
