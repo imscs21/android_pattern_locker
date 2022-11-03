@@ -5,9 +5,7 @@ import java.nio.ByteBuffer
 import java.security.MessageDigest
 import kotlin.random.Random
 import android.content.*
-import androidx.lifecycle.LiveData
 import androidx.lifecycle.MutableLiveData
-import java.io.PrintWriter
 import java.io.StringWriter
 
 typealias Position = Pair<Float,Float>//x,y position values
@@ -180,10 +178,10 @@ class PatternLockerDataController<T:Any> {
                 if(selectedPoints.size==0){
                     return false
                 }
-                selectedPoints.sortBy { it.first }
+                //selectedPoints.sortBy { it.first }
                 val md = MessageDigest.getInstance("MD5")
                 md.update(lockType.value.toByteArray(Charsets.UTF_8))
-
+                md.update(ByteBuffer.allocate(Int.SIZE_BYTES).putInt(lockType.intValue).array())
                 md.update(ByteBuffer.allocate(Int.SIZE_BYTES).putInt(selectedPoints.size).array())
                 for (i in selectedPoints.indices) {
                     md.update(ByteBuffer.allocate(Int.SIZE_BYTES).putInt(selectedPoints[i].second.first).array())
@@ -237,11 +235,11 @@ class PatternLockerDataController<T:Any> {
         ): Boolean {
             try{
                 if(selectedPoints.size>0){
-                    selectedPoints.sortBy { it.first }
+                    //selectedPoints.sortBy { it.first }
                 selectedPoints.let{
                             val md = MessageDigest.getInstance("MD5")
                             md.update(lockType.value.toByteArray(Charsets.UTF_8))
-
+                            md.update(ByteBuffer.allocate(Int.SIZE_BYTES).putInt(lockType.intValue).array())
                             md.update(ByteBuffer.allocate(Int.SIZE_BYTES).putInt(selectedPoints.size).array())
                             for(i in selectedPoints.indices){
 
@@ -312,7 +310,7 @@ class PatternLockerDataController<T:Any> {
         }
 
         
-        public fun<T:Any> build(context: Context,dataStorageBehavior: DataStorageBehavior<T>):PatternLockerDataController<T>{
+        public fun<T:Any> build(context: Context, dataStorageBehavior: DataStorageBehavior<T>):PatternLockerDataController<T>{
             if(tmpInstance==null){
                 createNewTempInstance<T>(context,dataStorageBehavior)
             }
@@ -348,12 +346,17 @@ class PatternLockerDataController<T:Any> {
     }
 
     public fun savePattern(lockType: PatternLockView.LockType, selectedPoints:ArrayList<SelectedPointItem>):Boolean{
+        if(selectedPoints.size>1){
+            selectedPoints.sortBy { it.first }
+        }
         return dataStorageBehavior.savePattern(lockType, selectedPoints)
     }
 
     
     public fun requestToCheckSelectedPoints(lockType: PatternLockView.LockType,selectedPoints:ArrayList<SelectedPointItem>){
-
+        if(selectedPoints.size>1){
+            selectedPoints.sortBy { it.first }
+        }
         try{
 
             onCheckingSelectedPointsListener?.onSuccess(

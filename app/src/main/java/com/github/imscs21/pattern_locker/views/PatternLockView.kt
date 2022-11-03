@@ -25,13 +25,13 @@ class PatternLockView : View ,View.OnTouchListener {
 
     public interface OnTaskPatternListener{
         public fun onNothingSelected()
-        public fun onFinishedPatternSelected(editModeFromView:Boolean,lockType: LockType,selectedPoints:ArrayList<SelectedPointItem>)
+        public fun onFinishedPatternSelected( patternLockView:PatternLockView,editModeFromView:Boolean,lockType: LockType,copiedSelectedPoints:ArrayList<SelectedPointItem>)
     }
 
 
     public enum class LockType(val value:String,val intValue:Int){
         SQUARE_3X3("SQUARE_3X3",1),
-        SQUARE_3X3_WITH_CHECKER_PATTERN("SQUARE_3X3_CHECK",2),//total (9+4) points
+        SQUARE_3X3_WITH_CHECKER_PATTERN("SQUARE_3X3_CHECKER",2),//total (9+4) points
         SQUARE_4X4("SQUARE_4X4",3),
         SQUARE_5X5("SQUARE_5X5",4),
         SQUARE_6X6("SQUARE_6X6",5),
@@ -66,6 +66,11 @@ class PatternLockView : View ,View.OnTouchListener {
 
     protected lateinit var selectedPoints:ArrayList<SelectedPointItem>
 
+    protected val selectedPointsLocker:Any by lazy{Any()}
+
+    @Volatile
+    protected var canCollectSelectedPoints = false
+
     public var onTaskPatternListener:OnTaskPatternListener? = null
 
     protected var floatingPoint:Pair<Float,Float>? = null
@@ -75,6 +80,8 @@ class PatternLockView : View ,View.OnTouchListener {
     protected lateinit var pointPaint:Paint
 
     protected lateinit var mainHandler:Handler
+
+    protected lateinit var secondHandler:Handler
 
     protected var pointColor:Int = Color.CYAN
 
@@ -168,7 +175,9 @@ class PatternLockView : View ,View.OnTouchListener {
             selectedPoints.clear()
             floatingPoint = null
             if(invalidateView) {
-                invalidate()
+                mainHandler.post {
+                    invalidate()
+                }
             }
         }
         return editMode || force
@@ -435,10 +444,15 @@ class PatternLockView : View ,View.OnTouchListener {
     
     protected final fun initVars(context:Context){
         if(!isInEditMode) {
-            vibrationUtil = VibrationUtil(context)
+            try {
+                vibrationUtil = VibrationUtil(context)
+            }catch(e:Exception){
+                android.util.Log.e("VibrationUtil","Initialization Error: Your Device may not supported vibrator.")
+            }
         }
         useVibratorIfAvaliable = true
         shouldShowTrajectoryLines = true
+        secondHandler = Handler(Looper.myLooper()!!)
         mainHandler = Handler(Looper.getMainLooper())
         //setLockTypes(Lock)
         val defaultLockType = LockType.SQUARE_3X3
@@ -612,49 +626,111 @@ class PatternLockView : View ,View.OnTouchListener {
     override fun onTouch(v: View, event: MotionEvent): Boolean {
         val x = event.x
         val y = event.y
-        //android.util.Log.e("onTouch",event.action.toString()+"  ")
+        /*val actionString = when(event.actionMasked){
+            MotionEvent.ACTION_DOWN->{
+                "ACTION_DOWN"
+            }
+            MotionEvent.ACTION_MOVE->{
+                "ACTION_MOVE"
+            }
+            MotionEvent.ACTION_UP->{
+                "ACTION_UP"
+            }
+            MotionEvent.ACTION_CANCEL->{
+                "ACTION_CANCEL"
+            }
+            MotionEvent.ACTION_HOVER_MOVE->{
+                "ACTION_HOVER_MOVE"
+            }
+            MotionEvent.ACTION_HOVER_ENTER->{
+                "ACTION_HOVER_ENTER"
+            }
+            MotionEvent.ACTION_HOVER_EXIT->{
+                "ACTION_HOVER_EXIT"
+            }
+            MotionEvent.ACTION_SCROLL->{
+                "ACTION_SCROLL"
+            }
+
+            MotionEvent.ACTION_POINTER_UP->{
+                "ACTION_POINTER_UP"
+            }
+            MotionEvent.ACTION_POINTER_DOWN->{
+                "ACTION_POINTER_DOWN"
+            }
+            MotionEvent.ACTION_BUTTON_PRESS->{
+                "ACTION_BUTTON_PRESS"
+            }
+            MotionEvent.ACTION_BUTTON_RELEASE->{
+                "ACTION_BUTTON_RELEASE"
+            }
+
+            else->{
+                "action unknown"
+            }
+        }
+        android.util.Log.e("onTouch",event.action.toString()+"  "+event.actionMasked.toString()+" "+actionString)
+        */
         when( event.actionMasked){
             MotionEvent.ACTION_DOWN , MotionEvent.ACTION_MOVE, MotionEvent.ACTION_HOVER_ENTER
                 ,MotionEvent.ACTION_HOVER_MOVE, MotionEvent.ACTION_SCROLL,MotionEvent.ACTION_BUTTON_PRESS
             , MotionEvent.ACTION_POINTER_DOWN
             -> {
-
-                handler.post {
+                synchronized(selectedPointsLocker){
+                    canCollectSelectedPoints = true
+                }
+                secondHandler.post {
+                    val cpX = x
+                    val cpY = y
                     val startSearchingTime = System.currentTimeMillis()
+                    var isFoundAvailablePoint = false
                     for (i in points.indices) {
                         val item = points[i]
                         val index_number = item.first
                         val area = item.second
 
                         if (calculateArea(
-                                x,
-                                y,
+                                cpX,
+                                cpY,
                                 area,
                                 pointRadius + clickingJudgementPaddingRadius
                             )
                         ) {
-                            if (//last_touch_point_index!=i&&
-                                !checkIndexNumberExists(index_number)) {
-                                if (useVibratorIfAvaliable) {
-                                    vibrationUtil?.vibrateAsClick()
-                                }
-                                //last_touch_point_index = i
-                                selectedPoints.add(SelectedPointItem(startSearchingTime,item))
-                                if (selectedPoints.size == 1) {
-                                    //closeMonitorInputThread()
-                                    //startMonitorInputThread()
+                            synchronized(selectedPointsLocker) {
+                                if (//last_touch_point_index!=i&&
+                                    canCollectSelectedPoints&&
+                                    !checkIndexNumberExists(index_number)) {
+                                    isFoundAvailablePoint = true
+                                    if (useVibratorIfAvaliable) {
+                                        vibrationUtil?.vibrateAsClick()
+                                    }
+                                    //last_touch_point_index = i
+
+                                    selectedPoints.add(SelectedPointItem(startSearchingTime, item))
+                                    if (selectedPoints.size == 1) {
+                                        //closeMonitorInputThread()
+                                        //startMonitorInputThread()
+                                    }
+
                                 }
                             }
-
                             break
+                        }
+                    }
+                    if(isFoundAvailablePoint){
+                        handler.post {
+                            invalidate()
                         }
                     }
                     //invalidate()
                 }
                 if(selectedPoints.size>0){
                     floatingPoint = Pair<Float,Float>(x,y)
+                    handler.post {
+                        invalidate()
+                    }
                 }
-                invalidate()
+
             }
             else ->{
                 /*if(editMode) {
@@ -665,13 +741,20 @@ class PatternLockView : View ,View.OnTouchListener {
                     floatingPoint = null
                     invalidate()
                 }*/
-                floatingPoint = null
-                invalidate()
-                if(selectedPoints.size>0) {
+                floatingPoint?.also {
+                    floatingPoint = null
+                    handler.post {
+                        invalidate()
+                    }
+                }
+                val cloneSelectedPoints = synchronized(selectedPointsLocker) {canCollectSelectedPoints = false
+                    ArrayList<SelectedPointItem>(selectedPoints)}
+                if(cloneSelectedPoints.size>0) {
                     onTaskPatternListener?.let{it.onFinishedPatternSelected(
+                        this,
                         editMode,
                         lockType,
-                        selectedPoints
+                        cloneSelectedPoints
                     )}
                         ?:run{
                             resetSelectedPoints(force=true)

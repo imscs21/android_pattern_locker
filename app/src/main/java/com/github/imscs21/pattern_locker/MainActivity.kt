@@ -12,7 +12,6 @@ import androidx.appcompat.widget.AppCompatButton
 import androidx.appcompat.widget.AppCompatSpinner
 import com.github.imscs21.pattern_locker.views.PatternLockView
 import com.github.imscs21.pattern_locker.views.PatternLockerDataController
-import com.github.imscs21.pattern_locker.views.PointItem
 import com.github.imscs21.pattern_locker.views.SelectedPointItem
 import com.google.android.material.switchmaterial.SwitchMaterial
 
@@ -100,15 +99,16 @@ class MainActivity : AppCompatActivity() {
             }
 
             override fun onFinishedPatternSelected(
+                view:PatternLockView,
                 editModeFromView: Boolean,
                 lockType: PatternLockView.LockType,
-                selectedPoints: ArrayList<SelectedPointItem>
+                copiedSelectedPoints: ArrayList<SelectedPointItem>
             ) {
                 if(editModeButton.isChecked){
                     //in pattern edit mode
                 }
                 else{
-                    patternDataContoller.requestToCheckSelectedPoints(lockType, selectedPoints)
+                    patternDataContoller.requestToCheckSelectedPoints(lockType, copiedSelectedPoints)
                 }
             }
 
@@ -116,7 +116,7 @@ class MainActivity : AppCompatActivity() {
        
         val patternList = listOf<String>(
             "square 3x3",
-            "square 3x3 check",
+            "square 3x3 checker",
             "square 4x4",
             "square 5x5",
             "square 6x6",

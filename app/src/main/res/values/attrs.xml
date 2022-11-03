@@ -18,7 +18,7 @@
 
         <attr name="patternType">
             <flag name="square_3x3" value="1"/>
-            <flag name="square_3x3_with_check_pattern" value="2"/>
+            <flag name="square_3x3_with_checker_pattern" value="2"/>
             <flag name="square_4x4" value="3"/>
             <flag name="square_5x5" value="4"/>
             <flag name="square_6x6" value="5"/>
