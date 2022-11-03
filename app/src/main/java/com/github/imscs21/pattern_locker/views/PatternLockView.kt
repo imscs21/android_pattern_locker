@@ -570,6 +570,7 @@ class PatternLockView : View ,View.OnTouchListener {
 
     
     protected fun drawLines(canvas: Canvas,points:ArrayList<SelectedPointItem>,with_lastline:Boolean = false,only_lastline:Boolean = false){
+
         if(selectedPoints.size>0){
             //linePaint.color = Color.BLACK
             if(!only_lastline){
@@ -710,6 +711,10 @@ class PatternLockView : View ,View.OnTouchListener {
                                     if (selectedPoints.size == 1) {
                                         //closeMonitorInputThread()
                                         //startMonitorInputThread()
+
+                                    }
+                                    else if(selectedPoints.size>1){
+                                        selectedPoints.sortedBy {  it.first}
                                     }
 
                                 }
