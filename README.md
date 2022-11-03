@@ -29,7 +29,7 @@ Pattern Locker Library for android
 * xml attributes
     1. (supported) pattern types
         * square_3x3
-        * square_3x3_with_check_pattern
+        * square_3x3_with_checker_pattern
         * square_4x4
         * square_5x5
         * square_6x6
