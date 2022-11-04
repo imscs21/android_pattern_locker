@@ -1034,7 +1034,7 @@ class PatternLockView : View ,View.OnTouchListener {
                 }*/
                 floatingPoint?.also {
                     /**
-                     * user not touch any of this view, so release drawing pattern
+                     * user do not touch any of this view, so release drawing pattern
                      */
                     floatingPoint = null
                     handler.post {
