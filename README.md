@@ -6,10 +6,29 @@ Pattern Locker Library for android
 
 
 # How TO APPLY
-### ※This version was not cleaned up to ease of applying
 
 ## 1. Import this lib to your project
-+ [See This for current version after downloading this lib](https://developer.android.com/studio/projects/android-library?hl=ko)
+1. add jitpack in your 'settings.gradle'
+
+    ```
+    dependencyResolutionManagement {
+        ...
+        repositories {
+            ...
+            maven { url 'https://jitpack.io' }
+        }
+        ...
+    }
+    ```
+
+2. add dependencies in your 'app/build.gradle'
+    ```
+    dependencies {
+        implementation 'com.github.imscs21:android_pattern_locker:0.1.0re2'
+        ...
+    }
+    ```
+
 
 
 
