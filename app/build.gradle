@@ -6,6 +6,9 @@ plugins {
     //id 'com.github.dcendents.android-maven'
 
 }
+//apply plugin : 'com.github.dcendents.android-maven'
+group = "com.github.imscs21"
+version="0.1.0"
 
 android {
     namespace 'com.github.imscs21.pattern_locker'
@@ -53,7 +56,7 @@ afterEvaluate {
             release(MavenPublication) {
                 from components.release
                 groupId = 'com.github.imscs21'
-                artifactId = 'android-pattern-locker-view'
+                artifactId = 'android_pattern_locker'
                 version = '0.1.0'
             }
         }

@@ -5,6 +5,7 @@ buildscript {
         mavenCentral()
     }
     dependencies {
+        //classpath 'com.android.tools.build:gradle:+'
         classpath "com.github.dcendents:android-maven-gradle-plugin:+"
     }
 }
@@ -16,4 +17,5 @@ plugins {
 
 allprojects {
     group = "com.github.imscs21"
+
 }
