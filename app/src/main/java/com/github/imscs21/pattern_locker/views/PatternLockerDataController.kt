@@ -5,6 +5,8 @@ import java.nio.ByteBuffer
 import java.security.MessageDigest
 import kotlin.random.Random
 import android.content.*
+import android.os.Handler
+import android.os.Looper
 import androidx.lifecycle.MutableLiveData
 import java.io.StringWriter
 
@@ -127,6 +129,8 @@ class PatternLockerDataController<T:Any> {
             private val randomObject:Random
 
             private val context:Context
+
+
 
             /**
              * @param context mainly used for obtaining instance of [sharedPreference]
@@ -261,9 +265,13 @@ class PatternLockerDataController<T:Any> {
          */
         private val random_state_factory:RandomStateFactory
 
-        constructor(context: Context){
+        private val uiHandler:Handler
+
+
+        constructor(context: Context,uiHandler:Handler = Handler(Looper.getMainLooper())){
             innerValue = MutableLiveData<String>()
             val spref_fn = "pattern_locker_preferences"
+            this.uiHandler = uiHandler
             sharedPreference = context.getSharedPreferences(spref_fn,Context.MODE_PRIVATE)
             random_state_factory = RandomStateFactory(context,1234)
             random_states = createOrLoadRandomStates()
@@ -287,7 +295,11 @@ class PatternLockerDataController<T:Any> {
             }catch(e:Exception){
 
             }
-            innerValue.value =  loadPattern()
+            loadPattern()?.let{
+                uiHandler.post {
+                    innerValue.value = it
+                }
+            }
         }
 
         /**
@@ -315,7 +327,11 @@ class PatternLockerDataController<T:Any> {
                     md.update(ByteBuffer.allocate(Int.SIZE_BYTES).putInt(selectedPoints[i].second.first).array())
                 }
                 synchronized(hashLocker) {
-                    innerValue. value = Base64.encode(md.digest(), Base64.DEFAULT).toString(Charsets.UTF_8)
+                    Base64.encode(md.digest(), Base64.DEFAULT).toString(Charsets.UTF_8).let {
+                        uiHandler.post {
+                            innerValue.value =it
+                        }
+                    }
                 }
                 try{
                     sharedPreference.edit().let {
@@ -403,7 +419,9 @@ class PatternLockerDataController<T:Any> {
          */
         override fun resetPattern(): Boolean {
             synchronized(hashLocker) {
-                innerValue. value = null
+                uiHandler.post {
+                    innerValue.value = null
+                }
             }
             try{
                 sharedPreference.edit().let {
