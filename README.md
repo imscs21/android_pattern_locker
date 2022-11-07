@@ -1,7 +1,16 @@
 # android_pattern_locker
 Pattern Locker Library for android
 
-![Demo image](screenshots/demo.gif)
+<img align="left" width="33%" height="auto" src="screenshots/demo.gif">
+<img align="left" width="33%" height="auto" src="screenshots/democapture1.png">
+<img align="left" width="33%" height="auto" src="screenshots/democapture2.png">
+<p>
+<br/>
+</p>
+
+<!--![Demo image](screenshots/demo.gif) -->
+
+
 
 
 
@@ -24,7 +33,7 @@ Pattern Locker Library for android
 2. add dependencies in your 'app/build.gradle'
     ```
     dependencies {
-        implementation 'com.github.imscs21:android_pattern_locker:v0.2.1'
+        implementation 'com.github.imscs21:android_pattern_locker:v0.3.0'
         ...
     }
     ```
@@ -44,8 +53,10 @@ Pattern Locker Library for android
         app:spacingSizeIfWrapContent="100dp"
         app:spacingTypeIfWrapContent="total"
         app:indicatorColor="#80ff80"
+        app:indicatorErrorColor="#F45079"
         app:indicatorRadius="6dp"
         app:trajectoryLineColor="#ff8080"
+        app:trajectoryLineErrorColor="#F38BA0"
         app:trajectoryLineThickness="5dp"
         app:showTrajectoryLines="true"
         app:useVibratorIfAvailable="true"
@@ -61,9 +72,9 @@ Pattern Locker Library for android
         * square_6x6
         * square_7x7
         * pentagon_shape_default
-        * ~~pentagon_shape_with_high_density~~
+        * pentagon_shape_with_high_density
         * hexagon_shape_default
-        * ~~hexagon_shape_with_high_density~~
+        * hexagon_shape_with_high_density
     2. spacingTypeIfWrapContent
        * total
        * fixed 
@@ -118,6 +129,20 @@ patternLockView.onTaskPatternListener = object:PatternLockView.OnTaskPatternList
             }
 
         }
+```
+
+#### 3.0. Hierarchical relation of pattern points instance
+```
+Position = Pair<Float,Float>//x,y position values
+
+
+PointItem = Pair<Int,Position>//pointID(index)number,Point Position
+
+SelectedPointItem = Pair<Long,PointItem>//task time order id(sequence id),PointItem
+
+points = ArrayList<PointItem>
+
+selectedPoints = ArrayList<SelectedPointItem>
 ```
 
 #### 3.1. Implement your own pattern storage behavior
@@ -221,7 +246,10 @@ patternLockView.apply {
                     )
                 )
             }
-
+            override fun getSpacingCount(): Int {
+                        //per each axis of shape
+                        return 2
+            }
         }
     setLockTypes(PatternLockView.LockType.CUSTOM)
 }
@@ -229,12 +257,32 @@ patternLockView.apply {
 
 
 
-### 4. Reset drawn pattern
+### 4. How to reset drawn pattern
 ```
 patternLockView.resetSelectedPoints(force = true,invalidateView = true)
 ```
 
-### 5. Reset stored pattern info
+### 5. How to reset stored pattern info
 ```
 patternDataContoller?.resetPattern()
+```
+
+### 5. How to use error indicator
+```
+patternLockView.apply {
+    isReadOnlyMode = true
+    patternLockView.turnErrorIndicator(
+        true,
+        invalidateView = true,
+        semiAutoTurningOffMills = 4000
+    )
+    onTurnOffErrorIndicatorListener =
+        object : PatternLockView.OnTurnOffErrorIndicatorListener {
+            override fun onTurnOff(view: PatternLockView, fromDelayedTime: Boolean) {
+                if (fromDelayedTime) {
+                    view.isReadOnlyMode = false
+                }
+            } 
+        }
+}
 ```
