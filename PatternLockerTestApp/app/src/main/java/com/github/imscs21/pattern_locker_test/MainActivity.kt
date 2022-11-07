@@ -29,16 +29,20 @@ class MainActivity : AppCompatActivity() {
 
     protected lateinit var patternDataContoller:PatternLockerDataController<String>
 
+    protected lateinit var forceErrorButton: AppCompatButton
+
     protected var listAdapterIndex:Int = -1
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
         patternLockView = findViewById(R.id.pattern_lock_view)
+
         patternSwitcher = findViewById(R.id.pattern_selector)
         editModeButton = findViewById(R.id.switch_edit_mode)
         resetPatternButton = findViewById(R.id.button_reset_pattern)
         taskPatternButton = findViewById(R.id.button_pattern_task)
+        forceErrorButton = findViewById(R.id.button_use_error)
         val sharedPreference = getSharedPreferences("pattern_locker_preferences", Context.MODE_PRIVATE)
         val lastPatternTypeIndex  = sharedPreference.getInt("pattern_type",-99)
         val lockTypes = PatternLockView.LockType.values()
@@ -50,6 +54,9 @@ class MainActivity : AppCompatActivity() {
                     break
                 }
             }
+        }
+        forceErrorButton.setOnClickListener {
+            patternLockView.turnErrorIndicator(true, semiAutoTurningOffMills = 4000)
         }
         patternDataContoller = PatternLockerDataController.PatternLockerDataControllerFactory.getInstance().build<String>(this,PatternLockerDataController.SimpleDataStorageBehavior(this))
         patternDataContoller.onCheckingSelectedPointsListener = object:PatternLockerDataController.OnCheckingSelectedPointsListener{
@@ -123,7 +130,9 @@ class MainActivity : AppCompatActivity() {
             "square 6x6",
             "square 7x7",
             "pentagon pattern",
-            "hexagon pattern"
+            "pentagon pattern high density",
+            "hexagon pattern",
+            "hexagon pattern high density"
         )
         val arrayList = ArrayList<String>(patternList)
 
@@ -159,7 +168,13 @@ class MainActivity : AppCompatActivity() {
                             patternLockView.setLockTypes(PatternLockView.LockType.PENTAGON_DEFAULT)
                         }
                         7->{
+                            patternLockView.setLockTypes(PatternLockView.LockType.PENTAGON_HIGH_DENSITY)
+                        }
+                        8->{
                             patternLockView.setLockTypes(PatternLockView.LockType.HEXAGON_DEFAULT)
+                        }
+                        9->{
+                            patternLockView.setLockTypes(PatternLockView.LockType.HEXAGON_HIGH_DENSITY)
                         }
                         else->{
                             patternLockView.setLockTypes(PatternLockView.LockType.SQUARE_3X3)

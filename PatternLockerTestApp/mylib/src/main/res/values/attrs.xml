@@ -8,10 +8,12 @@
         </attr>
 
         <attr name="indicatorColor" format="color|reference" />
+        <attr name="indicatorErrorColor" format="color|reference" />
         <attr name="indicatorRadius" format="dimension|reference"/>
         <attr name="showTrajectoryLines" format="boolean|reference"/>
         <attr name="useVibratorIfAvailable" format="boolean|reference" />
         <attr name="trajectoryLineColor" format="color|reference" />
+        <attr name="trajectoryLineErrorColor" format="color|reference" />
         <attr name="trajectoryLineThickness" format="dimension|reference" />
         <attr name="useTrajectoryLineShadow" format="boolean|reference"/>
         <attr name="recommendedClickingJudgementAreaPaddingRadius" format="dimension|reference" />

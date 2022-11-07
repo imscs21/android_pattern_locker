@@ -17,20 +17,90 @@ import com.github.imscs21.pattern_locker.R
 import com.github.imscs21.pattern_locker.utils.ThreadLockerPackage
 import com.github.imscs21.pattern_locker.utils.VibrationUtil
 import kotlinx.coroutines.selects.select
+import java.util.PriorityQueue
 import java.util.concurrent.Executor
+import java.util.concurrent.locks.Lock
 import kotlin.math.cos
 import kotlin.math.max
 import kotlin.math.sin
 
+/**
+ * Pattern View
+ * @author imscs21
+ * @since 2022-11-7
+ */
 class PatternLockView : View ,View.OnTouchListener {
 
-
+    /**
+     * callback listener when user has done to draw pattern
+     */
     public interface OnTaskPatternListener{
+        /**
+         * used when there is no any selected points
+         */
         public fun onNothingSelected()
+
+        /**
+         *
+         */
         public fun onFinishedPatternSelected( patternLockView:PatternLockView,editModeFromView:Boolean,lockType: LockType,copiedSelectedPoints:ArrayList<SelectedPointItem>)
     }
 
+    /**
+     * callback listener when drawing custom shape
+     */
+    public interface OnCalculateCustomShapePositionListener{
+        /**
+         * This method is for calculating custom shape
+         * @param canvasWidth width of view canvas
+         * @param canvasHeight height of view canvas
+         * @param directCanvas direct view canvas instance if available
+         * @param pointsOfPatternContainer list of points of pattern
+         * @param pointsOfPatternContainerMaxLength [pointsOfPatternContainer] can contain items util [pointsOfPatternContainerMaxLength]
+         * @param pointRadius radius value of each points of pattern(a.k.a. circle radius)
+         * @param spacingValuesIfWrapContent <spacing unit,spacing size> between points
+         * @param isPointContainerClearedBeforeThisMethod flag whether pointsOfPatternContainer had been cleared or not before entering this method
+         * @param customParams custom params is not currenly used
+         */
+        public fun onCalculateCustomShape(canvasWidth:Int,canvasHeight:Int,
+                                          directCanvas:Canvas?,
+                                          pointsOfPatternContainer:ArrayList<PointItem>,
+                                          pointsOfPatternContainerMaxLength:UInt,
+                                          pointRadius:Float,
+                                          spacingValuesIfWrapContent:Pair<SpacingTypeIfWrapContent,Float>,
+                                          isPointContainerClearedBeforeThisMethod:Boolean = true,
+                                          customParams : Any? = null)
 
+        /**
+         * this method is used to calculate spacing size when type of SpacingTypeIfWrapContent is total
+         */
+        public fun getSpacingCount():Int
+    }
+
+    /**
+     * callback listener for turning off error indicator
+     */
+    public interface OnTurnOffErrorIndicatorListener{
+        public fun onTurnOff(view:PatternLockView,fromDelayedTime:Boolean)
+    }
+
+    /**
+     * callback listener for custom point id(index)
+     */
+    public interface OnCalculateCustomIndexOfPointOfPatternListener{
+        /**
+         * this method is for custom id for custom calculating storing and checking algorithm
+         * @param originalIndex original index of pattern point
+         * @param pointPosition r/o point position which id coincided with [originalIndex] for checking position
+         */
+        public fun getPointIndex(originalIndex:Int,pointPosition:Position):Int
+    }
+
+    /**
+     * Pattern types
+     * @property value string identity value of each enums
+     * @property intValue integer identity value of each enums
+     */
     public enum class LockType(val value:String,val intValue:Int){
         SQUARE_3X3("SQUARE_3X3",1),
         SQUARE_3X3_WITH_CHECKER_PATTERN("SQUARE_3X3_CHECKER",2),//total (9+4) points
@@ -41,64 +111,253 @@ class PatternLockView : View ,View.OnTouchListener {
         PENTAGON_DEFAULT("PENTAGON_SHAPE",7),
         PENTAGON_HIGH_DENSITY("PENTAGON_SHAPE_HD",8),
         HEXAGON_DEFAULT("HEXAGON_SHAPE",9),
-        HEXAGON_HIGH_DENSITY("HEXAGON_SHAPE_HD",10)
+        HEXAGON_HIGH_DENSITY("HEXAGON_SHAPE_HD",10),
+
+        /**
+         * Custom type can be set in only kotlin
+         * and
+         * you should also set [onCalculateCustomPointOfPatternListener] property in code
+         * if you wanna use custom shape.
+         */
+        CUSTOM("DEVELOPER_CUSTOM",99)
     }
+
+    /**
+     * spacing types that how to measure spacing among points when using wrap content for view size
+     * @property intValue integer identity value of each enums
+     */
     public enum class SpacingTypeIfWrapContent(val intValue:Int){
         TOTAL(1),
         FIXED(2)
     }
 
-    
+    /**
+     *  listener property for calculating your own custom index
+     */
+    public var onCalculateCustomPointOfPatternListener:OnCalculateCustomIndexOfPointOfPatternListener? = null
+
+    /**
+     * listener property for calculating custom shape when selecting custom lock type
+     */
+    public var onCalculateCustomShapePositionListener:OnCalculateCustomShapePositionListener? = null
+
+    /**
+     * listener property for turning off error indicator
+     */
+    public var onTurnOffErrorIndicatorListener:OnTurnOffErrorIndicatorListener? = null
+
+    /**
+     * flag that checking abnormal judgement padding size for other developer`s mistakes
+     * when setting [clickingJudgementPaddingRadius] property
+     */
+    public var canPreventAbnormalJudgementPadding:Boolean = true
+    set(value) {
+        field = value
+        if(value&&dip1>0) {
+            clickingJudgementPaddingRadius = max(MIN_JDGMNT_PAD_RADIUS, min(clickingJudgementPaddingRadius,MAX_JDGMNT_PAD_RADIUS))
+        }
+    }
+
+
+    /**
+     * radius value of one of pattern points
+     */
     protected var pointRadius = 0f
 
+    /**
+     * @see [LockType]
+     */
     protected lateinit var lockType:LockType
 
+    /**
+     * pre-defined android dimension(a.k.a. android measurement size) for 1 of dip unit(a.k.a. 1.0dip)
+     * to ease calculating
+     */
     protected var dip1:Float = 0f
     set(value){
         field = value
         MIN_POINT_RADIUS = value*3
         MAX_POINT_RADIUS = value*100
+
+        MIN_JDGMNT_PAD_RADIUS = value*(-50)
+        MAX_JDGMNT_PAD_RADIUS = value*(1000)
     }
 
+    /**
+     * minimum radius value of one of pattern points
+     */
     protected var MIN_POINT_RADIUS:Float = 0f
 
+    /**
+     * maximum radius value of one of pattern points
+     */
     protected var MAX_POINT_RADIUS:Float = 110f
 
+    /**
+     * minimum radius value of judgement padding
+     */
+    protected var MIN_JDGMNT_PAD_RADIUS:Float = -50f
+
+    /**
+     * maximum radius value of judgement padding
+     */
+    protected var MAX_JDGMNT_PAD_RADIUS:Float = 500f
+
+    /**
+     * list of series of current pre-defined position of all pattern points
+     */
     protected lateinit var points:ArrayList<PointItem>
 
+    /**
+     * list of series of current pre-defined position and sequence id of selected pattern points
+     */
     protected lateinit var selectedPoints:ArrayList<SelectedPointItem>
 
+    /**
+     * locker instance for synchonizing data of [selectedPoints]
+     */
     protected val selectedPointsLocker:Any by lazy{Any()}
 
+    /**
+     * state of when we can put met pattern points to [selectedPoints] or not
+     */
     @Volatile
     protected var canCollectSelectedPoints = false
 
+    /**
+     * @see [OnTaskPatternListener]
+     */
     public var onTaskPatternListener:OnTaskPatternListener? = null
 
+    /**
+     * position of where we touched view
+     * if property value is null, it would be non-touched
+     */
     protected var floatingPoint:Pair<Float,Float>? = null
 
+    /**
+     * canvas paint instance of trajectory lines
+     */
     protected lateinit var linePaint:Paint
 
+    /**
+     * canvas paint instance of pattern points
+     */
     protected lateinit var pointPaint:Paint
 
+    /**
+     * handler for updating UI
+     */
     protected lateinit var mainHandler:Handler
 
+    /**
+     * handler from other thread(a.k.a. multithreading handler)
+     */
     protected lateinit var secondHandler:Handler
 
+    /**
+     * color property of pattern point
+     */
     protected var pointColor:Int = Color.CYAN
 
+    /**
+     * color property of pattern point when occured error
+     */
+    protected var pointErrorColor:Int = Color.MAGENTA
+
+    /**
+     * color property of selected pattern points
+     */
+    protected var selectedPointColor:Int = Color.CYAN
+    /**
+     * color property of selected pattern points when occured error
+     */
+    protected var selectedPointErrorColor:Int = Color.RED
+
+    /**
+     * vibration util instance when clicking pattern points
+     */
     protected var vibrationUtil: VibrationUtil? = null
 
+    /**
+     * locker for [isReadOnlyMode]
+     */
+    private val isReadOnlyModeLocker by lazy{Any()}
+
+    /**
+     * property for non-touchable mode
+     */
+    public var isReadOnlyMode:Boolean = false
+    get() {
+        val result = synchronized(isReadOnlyModeLocker){
+            field
+        }
+        return result
+    }
+    set(value){
+        synchronized(isReadOnlyModeLocker){
+            field = value
+        }
+        if(value){
+            floatingPoint = null
+        }
+    }
+
+
+
+    /**
+     * @see [SpacingTypeIfWrapContent]
+     */
     protected var spacingTypeIfWrapContent:SpacingTypeIfWrapContent = SpacingTypeIfWrapContent.TOTAL
 
+    /**
+     * how many size of we space padding among pattern points
+     * unit of size is [spacingTypeIfWrapContent]
+     * @see [SpacingTypeIfWrapContent]
+     */
     protected var spacingSizeIfWrapContent:Float = 100f
 
+    /**
+     * padding radius is used to have tolerance for boundary of each pattern points when judging to click pattern points
+     */
     public var clickingJudgementPaddingRadius:Float = 5f
+    set(value) {
 
+        if(canPreventAbnormalJudgementPadding){
+
+            var value2 = max(MIN_JDGMNT_PAD_RADIUS,min(value,MAX_JDGMNT_PAD_RADIUS))
+            field = value2
+        }
+        else{
+
+            val value2 = max(Float.MIN_VALUE.toDouble(),min(value.toDouble()+pointRadius.toDouble(),Float.MAX_VALUE.toDouble())).toFloat()
+            if(value2>=Float.MAX_VALUE){
+                field = value - pointRadius
+            }
+            else if(value2<=Float.MIN_VALUE){
+                field = value + pointRadius
+            }
+            else{
+                field = value
+            }
+
+        }
+    }
+
+    /**
+     * Is this view in pattern edit mode?
+     * this property is not mainly used nowadays.
+     */
     public var editMode:Boolean = false
 
+    /**
+     * on/off value whether using device vibration or not
+     */
     public var useVibratorIfAvaliable:Boolean = true
 
+    /**
+     * on/off value whether showing shadow of selected pattern trajectory lines or not
+     */
     public var useTrajectoryLineShadow:Boolean = false
         set(value)  {
             field = value
@@ -109,23 +368,51 @@ class PatternLockView : View ,View.OnTouchListener {
                 linePaint.clearShadowLayer()
             }
             try{
-                handler.post {
+                mainHandler.post {
                     invalidate()
                 }
             }catch(e:Exception){
 
             }
         }
-    
+
+    /**
+     * thread locker for [isUsingErrorIndicator] property
+     */
+    protected val isUsingErrorIndicatorLocker:Any by lazy{Any()}
+
+    /**
+     * flag whether using error indicator or not
+     */
+    public var isUsingErrorIndicator:Boolean = false
+    public get() {
+        val rst = synchronized(isUsingErrorIndicatorLocker){field}
+        return rst
+    }
+    protected set(value) {
+        synchronized(isUsingErrorIndicatorLocker) {
+            field = value
+        }
+    }
+
+    /**
+     * flag whether view should recalculate view size when used wrap_content or not
+     */
     protected var shouldRecalculateSize = false
-    
+
+    /**
+     * not currently used
+     */
     protected var innerViewGravity: Int = Gravity.CENTER
 
+    /**
+     * on/off value whether showing selected pattern trajectory lines or not
+     */
     public var shouldShowTrajectoryLines:Boolean = true
     set(value)  {
         field = value
         try{
-            handler.post {
+            mainHandler.post {
                 invalidate()
             }
         }catch(e:Exception){
@@ -134,17 +421,23 @@ class PatternLockView : View ,View.OnTouchListener {
     }
 
     constructor(context:Context):super(context){
-        initVars(context)
+        initializeVars(context)
     }
     constructor(context:Context,attrs:AttributeSet):super(context,attrs){
-        initVars(context)
+        initializeVars(context)
         setAttrs(context, attrs)
     }
     constructor(context: Context,attrs:AttributeSet,defStyle:Int):super(context, attrs,defStyle){
-        initVars(context)
+        initializeVars(context)
         setAttrs(context, attrs, defStyle)
     }
 
+    /**
+     * set spaceing type and size which run when one of view sizes is wrap content
+     * @param spacingType [SpacingTypeIfWrapContent]
+     * @param spacingSize spacing size between pattern points
+     * @param invalidateView flag whether view should redraw or not
+     */
     public fun setSpacingTypeIfWrapContent(spacingType:SpacingTypeIfWrapContent,spacingSize:Float,invalidateView: Boolean = true){
         spacingSizeIfWrapContent = spacingSize
         spacingTypeIfWrapContent = spacingType
@@ -171,6 +464,59 @@ class PatternLockView : View ,View.OnTouchListener {
 
     }
 
+    public fun turnErrorIndicator(stateValue:Boolean,invalidateView: Boolean = true,semiAutoTurningOffMills:Long = -1){
+        isUsingErrorIndicator = stateValue
+        if(!stateValue) {
+            mainHandler.post {
+                onTurnOffErrorIndicatorListener?.onTurnOff(this, false)
+            }
+        }
+        if(invalidateView){
+            mainHandler.post {
+                try {
+                    invalidate()
+                }catch(e:Exception){
+
+                }
+            }
+        }
+        if(semiAutoTurningOffMills>0){
+            secondHandler.postDelayed(
+                object:Runnable{
+                    override fun run() {
+                        isUsingErrorIndicator = false
+                        mainHandler.post {
+                            try {
+                                invalidate()
+                            }catch(e:Exception){
+
+                            }
+                            try{
+                                onTurnOffErrorIndicatorListener?.onTurnOff(this@PatternLockView, true)
+                            }catch(e:Exception){
+
+                            }
+                        }
+                    }
+                },semiAutoTurningOffMills
+            )
+        }
+    }
+
+    protected final fun getPointItemIndex(originalIndex: Int,pointPosition: Position):Int{
+        onCalculateCustomPointOfPatternListener?.let{
+            return it.getPointIndex(originalIndex,pointPosition)
+        }
+            ?:run{
+                return originalIndex
+            }
+    }
+
+    /**
+     * clear content of list of selected points
+     * @param force flag whether clear forcedly or not
+     * @param invalidateView flag whether view should redraw or not
+     */
     public fun resetSelectedPoints(force:Boolean = false ,invalidateView: Boolean = true):Boolean{
         if(editMode || force){
 
@@ -185,14 +531,27 @@ class PatternLockView : View ,View.OnTouchListener {
         return editMode || force
     }
 
+    /**
+     * get currently set lock type
+     * @see [LockType]
+     * @return current locktype
+     */
     public fun getLockTypes():LockType{
         return lockType
     }
 
+    /**
+     * get list of selected points
+     * @return arraylist of selected points
+     */
     public fun getSelectedPointss():ArrayList<SelectedPointItem>{
         return selectedPoints
     }
 
+    /**
+     * inherited method
+     * -> setting view size method
+     */
     override fun onMeasure(widthMeasureSpec: Int, heightMeasureSpec: Int) {
         super.onMeasure(widthMeasureSpec, heightMeasureSpec)
         val widthMode = MeasureSpec.getMode(widthMeasureSpec)
@@ -230,12 +589,26 @@ class PatternLockView : View ,View.OnTouchListener {
             LockType.PENTAGON_HIGH_DENSITY->{
                 6
             }
+            LockType.CUSTOM->{
+                onCalculateCustomShapePositionListener?.let{
+                    max(1,it.getSpacingCount())
+                }
+                    ?:run{
+                        1
+                    }
+            }
             else->{
                 3
             }
         }
         val minSpacing = spacingSizeIfWrapContent.let{if(spacingTypeIfWrapContent==SpacingTypeIfWrapContent.TOTAL){ (it)/numOfPoints}else{it}}
+        /**
+         * set shouldRecalculateSize attribute dynamically
+         */
         shouldRecalculateSize = (widthMode==MeasureSpec.AT_MOST||heightMode==MeasureSpec.AT_MOST)
+        /**
+         * check width mode and calculate width size if needed
+         */
         when(widthMode){
             MeasureSpec.AT_MOST ->{
                 mWidth = ((paddingLeft+paddingRight)+ ((2*(pointRadius+clickingJudgementPaddingRadius)+minSpacing)*(1+numOfPoints))).toInt()
@@ -245,6 +618,9 @@ class PatternLockView : View ,View.OnTouchListener {
 
             }
         }
+        /**
+         * check height mode and calculate height size if needed
+         */
         when(heightMode){
             MeasureSpec.AT_MOST ->{
                 mHeight = ((paddingTop+paddingBottom)+ ((2*(pointRadius+clickingJudgementPaddingRadius)+minSpacing)*(1+numOfPoints))).toInt()
@@ -253,17 +629,30 @@ class PatternLockView : View ,View.OnTouchListener {
 
             }
         }
+        /**
+         * set calculated width and height
+         */
         setMeasuredDimension(mWidth,mHeight)
     }
 
+    /**
+     * set lock type with associated inner event cycle
+     * @see [LockType]
+     */
     
     public fun setLockTypes(lockType:LockType,invalidateView:Boolean = true){
         var flag = false
+        /**
+         * if locktype is different then clear list of pattern points due to recalculate position
+         */
         if(this.lockType!=lockType){
             points.clear()
             flag = true
         }
         this.lockType = lockType
+        /**
+         * if(shouldRecalculateSize=true) then recalculate view size due to different lock type and differnt number of spacing among pattern points
+         */
         if(flag&&shouldRecalculateSize){
             mainHandler.post {
                 try{
@@ -285,12 +674,78 @@ class PatternLockView : View ,View.OnTouchListener {
         }
     }
 
-    
+    /**
+     * set lock type from external class(means not in this class)
+     * @param lockType value you want to set
+     * @see LockType
+     *
+     */
     public fun switchPattern(lockType: LockType){
         setLockTypes(lockType,invalidateView = true)
     }
+    /**
+     * initialize [points] and calculate positions of pattern points as developer custom shape pattern
+     * @param canvas [Canvas] class to obtain canvas width and height
+     * @param patternSize let number of pattern points of square shape pattern you want = y*y , then patternSize is y
+     */
+    protected fun initializedPointsAsCustomShape(canvas: Canvas){
+        val doClearPoints = true
+        if(doClearPoints) {
+            points.clear()
+        }
+        val maxPointSize = 4000
+        val doCheckBoundary = true
+        onCalculateCustomShapePositionListener?.let {
+            it.onCalculateCustomShape(canvasHeight = canvas.height,
+                canvasWidth = canvas.width,
+                directCanvas = null,
+                pointsOfPatternContainer = points,
+                pointsOfPatternContainerMaxLength = maxPointSize.toUInt(),
+                pointRadius = pointRadius,
+                spacingValuesIfWrapContent = Pair<SpacingTypeIfWrapContent,Float>(spacingTypeIfWrapContent,spacingSizeIfWrapContent),
+                isPointContainerClearedBeforeThisMethod = doClearPoints,
+                customParams = null
+            )
+            if(points.size>2*maxPointSize){
+                val tmp = ArrayList<PointItem>()
+                for(i in 0 until maxPointSize){
+                    tmp.add(points[i])
+                }
+                points = tmp
+            }else{
+                while(points.size>maxPointSize){
+                    points.removeLast()
+                }
+            }
+            if(doCheckBoundary){//it takes more time
 
-    
+                val tmp = points.filter{
+                   val position = it.second
+                    if(0<=position.first && position.first <= canvas.width
+                        &&
+                        0<=position.second && position.second <= canvas.height
+                    ){
+                        return@filter true
+                    }
+                    return@filter false
+                }
+                points.clear()
+                points.addAll(tmp)
+
+            }
+
+        }
+            ?:run{
+                initalizePointsAsSquare(canvas,3)
+            }
+
+    }
+
+    /**
+     * initialize [points] and calculate positions of pattern points as square shape pattern
+     * @param canvas [Canvas] class to obtain canvas width and height
+     * @param patternSize let number of pattern points of square shape pattern you want = y*y , then patternSize is y
+     */
     protected fun initalizePointsAsSquare(canvas: Canvas,patternSize: Int){
         val height = canvas.height
         val width = canvas.width
@@ -298,6 +753,9 @@ class PatternLockView : View ,View.OnTouchListener {
         val cy = height/2.0f
         val commonSize = min(max(0,width- (paddingLeft + paddingRight)),max(height - (paddingTop + paddingBottom),0)) - 2*pointRadius
         if(patternSize==-3){
+            /**
+             * calculate positions of pattern points of checker square shape pattern
+             */
             var index = 0
             val fitCircleRadius:Float = (commonSize/(patternSize.toFloat()))
             val practicalCircleRadius = (commonSize/(((-patternSize)*2-1).toFloat()))
@@ -309,23 +767,30 @@ class PatternLockView : View ,View.OnTouchListener {
                     }
                     val px = (cx-commonSize/2.0f+practicalCircleRadius/2.0f )+practicalCircleRadius*i.toFloat()
                     val py = (cy-commonSize/2.0f+practicalCircleRadius/2.0f)+practicalCircleRadius*j.toFloat()//min((fitCircleRadius+(2*fitCircleRadius)*i) + paddingTop,height - paddingBottom+0.0f)
-                    points.add(Pair<Int,Pair<Float,Float>>(++index,Pair<Float,Float>(px,py)))
+                    points.add(Pair<Int,Position>(getPointItemIndex(++index, Position(px,py)),Position(px,py)))
                 }
             }
         }else {
+            /**
+             * calculate positions of pattern points of normal square shape pattern
+             */
             val fitCircleRadius:Float = (commonSize/(patternSize.toFloat()))
             var index = 0
             for(i in 0 until patternSize){
                 for(j in 0 until patternSize){
                     val px = (cx-commonSize/2.0f+fitCircleRadius/2.0f)+fitCircleRadius*i.toFloat()
                     val py = (cy-commonSize/2.0f+fitCircleRadius/2.0f)+fitCircleRadius*j.toFloat()//min((fitCircleRadius+(2*fitCircleRadius)*i) + paddingTop,height - paddingBottom+0.0f)
-                    points.add(Pair<Int,Pair<Float,Float>>(++index,Pair<Float,Float>(px,py)))
+                    points.add(Pair<Int,Position>(getPointItemIndex(++index, Position(px,py)),Position(px,py)))
                 }
             }
         }
     }
 
-    
+    /**
+     * calculate position of pattern points as pentagon shape
+     * @param canvas view canvas
+     * @param useHighDensity calculate with high density,currently not used
+     */
     protected fun initalizePointsAsPentagonShape(canvas: Canvas,useHighDensity: Boolean){
         val height = canvas.height
         val width = canvas.width
@@ -333,39 +798,163 @@ class PatternLockView : View ,View.OnTouchListener {
 
         val yOffset = height/2
         val xOffset = width/2
+
+        /**
+         * outer pentagon shape radius
+         */
         val radius = commonSize/2.0f - pointRadius
         var index = 0
         if(useHighDensity){
-            throw UnsupportedOperationException("Not supported yet. :P")
-        }
-        else{
+            /**
+             * calculate positions of pattern points of normal square shape pattern
+             */
             //canvas.drawCircle(cx.toFloat(),cy.toFloat(),100f,tmpPaint)
+            /**
+             * inner pentagon shape radius
+             */
             val halfRadius = (radius*sin(Math.toRadians(54.0))).toFloat()
+            val halfOuterRadius = (halfRadius/cos(Math.toRadians(54.0/6))).toFloat()
+            val middleHalfRadius = (((2*radius)/3.0f)*sin(Math.toRadians(54.0))).toFloat()
+            /**
+             * frequency degree of position of outer peak point in pentagon shape
+             */
             val stepSize= 72
             for(i in 0 until 360 step stepSize){
+                /**
+                 * angle degree offset
+                 */
                 val degOffset:Int = -18
+
+                /**
+                 * position of outer point
+                 */
                 val py = ((sin(Math.toRadians((i+degOffset)%360+0.0)).toFloat())*radius)+yOffset
                 val px = ((cos(Math.toRadians((i+degOffset)%360+0.0)).toFloat())*radius)+xOffset
+
+                /**
+                 * position of middle point
+                 */
+                val py2 = ((sin(Math.toRadians(((i+degOffset)%360)+0.0)).toFloat())*((2*radius)/3.0f))+yOffset
+                val px2 = ((cos(Math.toRadians(((i+degOffset)%360)+0.0)).toFloat())*((2*radius)/3.0f))+xOffset
+
+                /**
+                 * position of inner point
+                 */
+                val py3 = ((sin(Math.toRadians(((i+degOffset)%360)+0.0)).toFloat())*(radius/3.0f))+yOffset
+                val px3 = ((cos(Math.toRadians(((i+degOffset)%360)+0.0)).toFloat())*(radius/3.0f))+xOffset
+
+                /**
+                 * center(a.k.a. average(?)) position of positions between two adjacent outer peak points
+                 */
+                val py_half = ((sin(Math.toRadians((i+degOffset+stepSize/2)%360+0.0)).toFloat())*middleHalfRadius)+yOffset
+                val px_half = ((cos(Math.toRadians((i+degOffset+stepSize/2)%360+0.0)).toFloat())*middleHalfRadius)+xOffset
+
+
+                val outer_offset_angle = stepSize/3.0f - 1.5
+                val py_outer_half1 = ((sin(Math.toRadians((i+outer_offset_angle+degOffset)%360+0.0)).toFloat())*halfOuterRadius)+yOffset
+                val px_outer_half1 = ((cos(Math.toRadians((i+outer_offset_angle+degOffset)%360+0.0)).toFloat())*halfOuterRadius)+xOffset
+
+                val py_outer_half2 = ((sin(Math.toRadians((i+(stepSize-outer_offset_angle)+degOffset)%360+0.0)).toFloat())*halfOuterRadius)+yOffset
+                val px_outer_half2 = ((cos(Math.toRadians((i+(stepSize-outer_offset_angle)+degOffset)%360+0.0)).toFloat())*halfOuterRadius)+xOffset
+
+                /*
+                val pts1 = Position(px,py)
+                val pts2 = Position(px2,py2)
+                val pts1Half = Position(px_half,py_half)
+                points.add(PointItem(getPointItemIndex(++index,pts1),pts1))
+                points.add(PointItem(getPointItemIndex(++index,pts1Half),pts1Half))
+                points.add(PointItem(getPointItemIndex(++index,pts2),pts2))*/
+
+                val pts1 = Position(px,py)
+                val pts2 = Pair<Float,Float>(px2,py2)
+                val pts3 = Pair<Float,Float>(px3,py3)
+                val pts1Half = Pair<Float,Float>(px_half,py_half)
+                val ptsOuterHalf1 = Position(px_outer_half1,py_outer_half1)
+                val ptsOuterHalf2 = Position(px_outer_half2,py_outer_half2)
+
+                points.add(PointItem(getPointItemIndex(++index,pts1),pts1))
+                points.add(PointItem(getPointItemIndex(++index,pts1Half),pts1Half))
+                points.add(PointItem(getPointItemIndex(++index,pts2),pts2))
+                points.add(PointItem(getPointItemIndex(++index,pts3),pts3))
+                points.add(PointItem(getPointItemIndex(++index,ptsOuterHalf1),ptsOuterHalf1))
+                points.add(PointItem(getPointItemIndex(++index,ptsOuterHalf2),ptsOuterHalf2))
+            }
+            /**
+             * real center position of pentagon shape
+             */
+            val centerPt = Pair<Float,Float>(xOffset.toFloat(),yOffset.toFloat())
+            /**
+             * add real center position of pentagon shape
+             */
+            points.add(PointItem(getPointItemIndex(++index,centerPt),centerPt))
+            //canvas.drawPath(outerPaths,tmpPaint)
+            //canvas.drawPath(innerPaths,tmpPaint2)
+        }
+        else{
+            /**
+             * calculate positions of pattern points of normal square shape pattern
+             */
+            //canvas.drawCircle(cx.toFloat(),cy.toFloat(),100f,tmpPaint)
+            /**
+             * inner pentagon shape radius
+             */
+            val halfRadius = (radius*sin(Math.toRadians(54.0))).toFloat()
+
+            /**
+             * frequency degree of position of outer peak point in pentagon shape
+             */
+            val stepSize= 72
+            for(i in 0 until 360 step stepSize){
+                /**
+                 * angle degree offset
+                 */
+                val degOffset:Int = -18
+
+                /**
+                 * position of outer point
+                 */
+                val py = ((sin(Math.toRadians((i+degOffset)%360+0.0)).toFloat())*radius)+yOffset
+                val px = ((cos(Math.toRadians((i+degOffset)%360+0.0)).toFloat())*radius)+xOffset
+
+                /**
+                 * position of inner point
+                 */
                 val py2 = ((sin(Math.toRadians(((i+degOffset)%360)+0.0)).toFloat())*(radius/2))+yOffset
                 val px2 = ((cos(Math.toRadians(((i+degOffset)%360)+0.0)).toFloat())*(radius/2))+xOffset
+
+                /**
+                 * center(a.k.a. average(?)) position of positions between two adjacent outer peak points
+                 */
                 val py_half = ((sin(Math.toRadians((i+degOffset+stepSize/2)%360+0.0)).toFloat())*halfRadius)+yOffset
                 val px_half = ((cos(Math.toRadians((i+degOffset+stepSize/2)%360+0.0)).toFloat())*halfRadius)+xOffset
 
-                val pts1 = Pair<Float,Float>(px,py)
-                val pts2 = Pair<Float,Float>(px2,py2)
-                val pts1Half = Pair<Float,Float>(px_half,py_half)
-                points.add(Pair<Int,Pair<Float,Float>>(++index,pts1))
-                points.add(Pair<Int,Pair<Float,Float>>(++index,pts1Half))
-                points.add(Pair<Int,Pair<Float,Float>>(++index,pts2))
+                val pts1 = Position(px,py)
+                val pts2 = Position(px2,py2)
+                val pts1Half = Position(px_half,py_half)
+                points.add(PointItem(getPointItemIndex(++index,pts1),pts1))
+                points.add(PointItem(getPointItemIndex(++index,pts1Half),pts1Half))
+                points.add(PointItem(getPointItemIndex(++index,pts2),pts2))
+
+
             }
+            /**
+             * real center position of pentagon shape
+             */
             val centerPt = Pair<Float,Float>(xOffset.toFloat(),yOffset.toFloat())
-            points.add(Pair<Int,Pair<Float,Float>>(++index,centerPt))
+            /**
+             * add real center position of pentagon shape
+             */
+            points.add(PointItem(getPointItemIndex(++index,centerPt),centerPt))
             //canvas.drawPath(outerPaths,tmpPaint)
             //canvas.drawPath(innerPaths,tmpPaint2)
         }
     }
 
-    
+    /**
+     * calculate position of pattern points as hexagon shape
+     * @param canvas view canvas
+     * @param useHighDensity calculate with high density,currently not used
+     */
     protected fun initalizePointsAsHexagonShape(canvas: Canvas,useHighDensity: Boolean){
         val height = canvas.height
         val width = canvas.width
@@ -375,34 +964,131 @@ class PatternLockView : View ,View.OnTouchListener {
         val radius = commonSize/2.0f - pointRadius
         var index = 0
         if(useHighDensity){
-            throw UnsupportedOperationException("Not supported yet. :P")
+            //canvas.drawCircle(cx.toFloat(),cy.toFloat(),100f,tmpPaint)
+            val getHalfRadius:(Float,Double)->(Float) = {r,angle->
+                (r*sin(Math.toRadians(angle))).toFloat()
+            }
+            /**
+             * inner hexagon shape radius
+             */
+            val halfRadius = getHalfRadius(radius,60.0)//(radius*sin(Math.toRadians(60.0))).toFloat()
+            val halfOuterRadius = (halfRadius/ cos(Math.toRadians(10.0))).toFloat()
+            val middleHalfRadius = getHalfRadius((2*radius)/3.0f,60.0)
+            for(i in 0 until 360 step 60){
+                /**
+                 * position of outer point
+                 */
+                val py = ((sin(Math.toRadians(i+0.0)).toFloat())*radius)+yOffset
+                val px = ((cos(Math.toRadians(i+0.0)).toFloat())*radius)+xOffset
+                /**
+                 * position of inner point
+                 */
+                val py2 = ((sin(Math.toRadians(((i)%360)+0.0)).toFloat())*((2*radius)/3))+yOffset
+                val px2 = ((cos(Math.toRadians(((i)%360)+0.0)).toFloat())*((2*radius)/3))+xOffset
+
+                /**
+                 * position of inner point
+                 */
+                val py3 = ((sin(Math.toRadians(((i)%360)+0.0)).toFloat())*(radius/3))+yOffset
+                val px3 = ((cos(Math.toRadians(((i)%360)+0.0)).toFloat())*(radius/3))+xOffset
+
+                /**
+                 * center(a.k.a. average(?)) position of positions between two adjacent outer peak points
+                 */
+                val py_half = ((sin(Math.toRadians((i+30)%360+0.0)).toFloat())*middleHalfRadius)+yOffset
+                val px_half = ((cos(Math.toRadians((i+30)%360+0.0)).toFloat())*middleHalfRadius)+xOffset
+
+                /**
+                 * center(a.k.a. average(?)) position of positions between two adjacent outer peak points
+                 */
+                val outer_offset_angle = 20
+                val py_outer_half1 = ((sin(Math.toRadians((i+outer_offset_angle)%360+0.0)).toFloat())*halfOuterRadius)+yOffset
+                val px_outer_half1 = ((cos(Math.toRadians((i+outer_offset_angle)%360+0.0)).toFloat())*halfOuterRadius)+xOffset
+
+                val py_outer_half2 = ((sin(Math.toRadians((i+(60-outer_offset_angle))%360+0.0)).toFloat())*halfOuterRadius)+yOffset
+                val px_outer_half2 = ((cos(Math.toRadians((i+(60-outer_offset_angle))%360+0.0)).toFloat())*halfOuterRadius)+xOffset
+
+                val pts1 = Position(px,py)
+                val pts2 = Pair<Float,Float>(px2,py2)
+                val pts3 = Pair<Float,Float>(px3,py3)
+                val pts1Half = Pair<Float,Float>(px_half,py_half)
+                val ptsOuterHalf1 = Position(px_outer_half1,py_outer_half1)
+                val ptsOuterHalf2 = Position(px_outer_half2,py_outer_half2)
+                /*points.add(Pair<Int,Pair<Float,Float>>(getPointItemIndex(++index,pts1),pts1))
+                points.add(Pair<Int,Pair<Float,Float>>(++index,pts1Half))
+                points.add(Pair<Int,Pair<Float,Float>>(++index,pts2))*/
+                points.add(PointItem(getPointItemIndex(++index,pts1),pts1))
+                points.add(PointItem(getPointItemIndex(++index,pts1Half),pts1Half))
+                points.add(PointItem(getPointItemIndex(++index,pts2),pts2))
+                points.add(PointItem(getPointItemIndex(++index,pts3),pts3))
+
+                //points.add(PointItem(getPointItemIndex(++index,pts2),pts2))
+                points.add(PointItem(getPointItemIndex(++index,ptsOuterHalf1),ptsOuterHalf1))
+                points.add(PointItem(getPointItemIndex(++index,ptsOuterHalf2),ptsOuterHalf2))
+            }
+            /**
+             * real center position of hexagon shape
+             */
+            val centerPt = Pair<Float,Float>(xOffset.toFloat(),yOffset.toFloat())
+            /**
+             * add real center position of hexagon shape
+             */
+            //points.add(Pair<Int,Pair<Float,Float>>(++index,centerPt))
+            points.add(PointItem(getPointItemIndex(++index,centerPt),centerPt))
+            //canvas.drawPath(outerPaths,tmpPaint)
         }
         else{
             //canvas.drawCircle(cx.toFloat(),cy.toFloat(),100f,tmpPaint)
+            /**
+             * inner hexagon shape radius
+             */
             val halfRadius = (radius*sin(Math.toRadians(60.0))).toFloat()
             for(i in 0 until 360 step 60){
+                /**
+                 * position of outer point
+                 */
                 val py = ((sin(Math.toRadians(i+0.0)).toFloat())*radius)+yOffset
                 val px = ((cos(Math.toRadians(i+0.0)).toFloat())*radius)+xOffset
+                /**
+                 * position of inner point
+                 */
                 val py2 = ((sin(Math.toRadians(((i)%360)+0.0)).toFloat())*(radius/2))+yOffset
                 val px2 = ((cos(Math.toRadians(((i)%360)+0.0)).toFloat())*(radius/2))+xOffset
+                /**
+                 * center(a.k.a. average(?)) position of positions between two adjacent outer peak points
+                 */
                 val py_half = ((sin(Math.toRadians((i+30)%360+0.0)).toFloat())*halfRadius)+yOffset
                 val px_half = ((cos(Math.toRadians((i+30)%360+0.0)).toFloat())*halfRadius)+xOffset
 
-                val pts1 = Pair<Float,Float>(px,py)
+                val pts1 = Position(px,py)
                 val pts2 = Pair<Float,Float>(px2,py2)
                 val pts1Half = Pair<Float,Float>(px_half,py_half)
-                points.add(Pair<Int,Pair<Float,Float>>(++index,pts1))
+                /*points.add(Pair<Int,Pair<Float,Float>>(getPointItemIndex(++index,pts1),pts1))
                 points.add(Pair<Int,Pair<Float,Float>>(++index,pts1Half))
-                points.add(Pair<Int,Pair<Float,Float>>(++index,pts2))
+                points.add(Pair<Int,Pair<Float,Float>>(++index,pts2))*/
+                points.add(PointItem(getPointItemIndex(++index,pts1),pts1))
+                points.add(PointItem(getPointItemIndex(++index,pts1Half),pts1Half))
+                points.add(PointItem(getPointItemIndex(++index,pts2),pts2))
             }
+            /**
+             * real center position of hexagon shape
+             */
             val centerPt = Pair<Float,Float>(xOffset.toFloat(),yOffset.toFloat())
-            points.add(Pair<Int,Pair<Float,Float>>(++index,centerPt))
+            /**
+             * add real center position of hexagon shape
+             */
+            //points.add(Pair<Int,Pair<Float,Float>>(++index,centerPt))
+            points.add(PointItem(getPointItemIndex(++index,centerPt),centerPt))
             //canvas.drawPath(outerPaths,tmpPaint)
         }
     }
 
-    
-    protected fun initalizePointsBy(canvas: Canvas,lockType: LockType){
+    /**
+     * initialize positions of pattern points by lockType
+     * @param canvas view canvas
+     * @param lockType pivot lock type
+     */
+    protected fun initializePointsBy(canvas: Canvas,lockType: LockType){
         points.clear()
         selectedPoints.clear()
         lockType.let{
@@ -411,6 +1097,7 @@ class PatternLockView : View ,View.OnTouchListener {
                     LockType.SQUARE_3X3 ->{
                         initalizePointsAsSquare(canvas,3)
                     }
+
                     LockType.SQUARE_3X3_WITH_CHECKER_PATTERN ->{
                         initalizePointsAsSquare(canvas,-3)
                     }
@@ -435,6 +1122,9 @@ class PatternLockView : View ,View.OnTouchListener {
                     LockType.PENTAGON_HIGH_DENSITY->{
                         initalizePointsAsPentagonShape(canvas,useHighDensity=true)
                     }
+                    LockType.CUSTOM ->{
+                        initializedPointsAsCustomShape(canvas)
+                    }
                     else ->{//LockType.SQUARE_4X4
                         initalizePointsAsSquare(canvas,4)
                     }
@@ -443,8 +1133,10 @@ class PatternLockView : View ,View.OnTouchListener {
         }
     }
 
-    
-    protected final fun initVars(context:Context){
+    /**
+     *  initialize inner variables commonly
+     */
+    protected final fun initializeVars(context:Context){
         if(!isInEditMode) {
             try {
                 vibrationUtil = VibrationUtil(context)
@@ -455,7 +1147,7 @@ class PatternLockView : View ,View.OnTouchListener {
         useVibratorIfAvaliable = true
         shouldShowTrajectoryLines = true
         
-        secondHandler = Handler(Looper.myLooper()!!)
+        secondHandler = Handler(Looper.myLooper()?.let{it}?:run{Looper.getMainLooper()})
         mainHandler = Handler(Looper.getMainLooper())
         //setLockTypes(Lock)
         val defaultLockType = LockType.SQUARE_3X3
@@ -475,20 +1167,30 @@ class PatternLockView : View ,View.OnTouchListener {
             val theme = context.theme
             //theme.resolveAttribute(R.attr.theme_color, typedValue, true);
             //@ColorInt int color = typedValue.data;
+
             var def_color = Color.BLACK
-            if(theme.resolveAttribute(android.R.attr.textAppearance,typedValue,true)){
-                val res_id = typedValue.resourceId //current_themed_value.data
-                var tmp_typed_array: TypedArray = context.theme.obtainStyledAttributes(
-                    res_id,
-                    IntArray(1, { android.R.attr.textColor })
-                )
-                if (Build.VERSION.SDK_INT >= 23) {
-                    def_color =
-                        context.resources.getColor(tmp_typed_array.getResourceId(0, 0), context.theme)
-                } else {
-                    def_color = context.resources.getColor(tmp_typed_array.getResourceId(0, 0))
+            try {
+                if (theme.resolveAttribute(android.R.attr.textAppearance, typedValue, true)) {
+                    val res_id = typedValue.resourceId //current_themed_value.data
+                    var tmp_typed_array: TypedArray = context.theme.obtainStyledAttributes(
+                        res_id,
+                        IntArray(1, { android.R.attr.textColor })
+                    )
+                    if (Build.VERSION.SDK_INT >= 23) {
+                        def_color =
+                            context.resources.getColor(
+                                tmp_typed_array.getResourceId(0, 0),
+                                context.theme
+                            )
+                    } else {
+                        def_color = context.resources.getColor(tmp_typed_array.getResourceId(0, 0))
+                    }
                 }
+            }catch(e:Exception){
+
             }
+            selectedPointColor = def_color
+            selectedPointErrorColor = Color.RED
             this.color = def_color
             this.strokeCap = Paint.Cap.ROUND
             this.strokeWidth = 3*dip1//pointRadius/3
@@ -504,12 +1206,14 @@ class PatternLockView : View ,View.OnTouchListener {
         try {
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
                 pointColor = context.getColor(R.color.purple_700)
+
             } else {
                 pointColor = context.resources.getColor(R.color.purple_700)
             }
         }catch(e:Exception){
 
         }
+        pointErrorColor = Color.MAGENTA
         pointPaint.apply{
             this.setShadowLayer(dip1,1f,1f,Color.GRAY)
             this.color = pointColor
@@ -520,7 +1224,9 @@ class PatternLockView : View ,View.OnTouchListener {
 
     }
 
-
+    /**
+     * parse and set attributes from layout xml
+     */
     private final fun setAttrs(context: Context,attrs: AttributeSet,defStyle:Int = -1){
         var attributes: TypedArray = context.obtainStyledAttributes(attrs, R.styleable.PatternLockView)
         attrs?.let{
@@ -529,6 +1235,9 @@ class PatternLockView : View ,View.OnTouchListener {
         }
         val attr_indicator_color:Int = attributes.getColor(R.styleable.PatternLockView_indicatorColor,pointColor)
         pointColor = attr_indicator_color
+
+        val attr_indicator_error_color:Int = attributes.getColor(R.styleable.PatternLockView_indicatorErrorColor,pointErrorColor)
+        pointErrorColor = attr_indicator_error_color
 
 
 
@@ -545,14 +1254,18 @@ class PatternLockView : View ,View.OnTouchListener {
 
         var attr_trajectory_line_thickness = attributes.getDimension(R.styleable.PatternLockView_trajectoryLineThickness,linePaint.strokeWidth)
         linePaint.strokeWidth = attr_trajectory_line_thickness
-        var attr_trajectory_line_color = attributes.getColor(R.styleable.PatternLockView_trajectoryLineColor,linePaint.color)
-        linePaint.color = attr_trajectory_line_color
+        var attr_trajectory_line_color = attributes.getColor(R.styleable.PatternLockView_trajectoryLineColor,selectedPointColor)
+        selectedPointColor = attr_trajectory_line_color
+        //linePaint.color = attr_trajectory_line_color
+
+        var attr_trajectory_line_error_color = attributes.getColor(R.styleable.PatternLockView_trajectoryLineErrorColor,selectedPointErrorColor)
+        selectedPointErrorColor = attr_trajectory_line_error_color
 
 
 
         val attr_pattern_type = attributes.getInt(R.styleable.PatternLockView_patternType,lockType.intValue)
         for(lt in LockType.values()){
-            if(attr_pattern_type==lt.intValue){
+            if(attr_pattern_type==lt.intValue&&attr_pattern_type!=LockType.CUSTOM.intValue){
                 setLockTypes(lt,invalidateView = false)
                 break
             }
@@ -570,19 +1283,33 @@ class PatternLockView : View ,View.OnTouchListener {
 
     }
 
-    
+    /**
+     * render all pattern positions by your lock type
+     * @param canvas view canvas
+     * @param points list of positions of pattern points
+     * @param point_radius how big size(a.k.a. circle radius) of points per one of pattern points
+     */
     protected fun drawPoints(canvas: Canvas,points:ArrayList<Pair<Int,Pair<Float,Float>>>,point_radius:Float = pointRadius){
-        pointPaint.color = pointColor
+        pointPaint.color = if(isUsingErrorIndicator){pointErrorColor}else{pointColor}
         for(pts in points){
+
             val point_index = pts.first
             val point_pos = pts.second
             canvas.drawCircle(point_pos.first,point_pos.second,point_radius,pointPaint)
         }
     }
 
-    
-    protected fun drawLines(canvas: Canvas,points:ArrayList<SelectedPointItem>,with_lastline:Boolean = false,only_lastline:Boolean = false){
 
+    /**
+     * render trajectory lines from selected pattern points
+     * @param canvas view canvas
+     * @param points list of selected points
+     * @param with_lastline render lines with position of you touched and position of last of selected points
+     * @param only_lastline render only line between position of you touched and position of last of selected points
+     * @param only_lastline render only line between position of you touched and position of last of selected points
+     */
+    protected fun drawLines(canvas: Canvas,points:ArrayList<SelectedPointItem>,with_lastline:Boolean = false,only_lastline:Boolean = false){
+        linePaint.color = if(isUsingErrorIndicator){selectedPointErrorColor}else{selectedPointColor}
         if(selectedPoints.size>0){
             //linePaint.color = Color.BLACK
             if(!only_lastline){
@@ -608,11 +1335,14 @@ class PatternLockView : View ,View.OnTouchListener {
         }
     }
 
-    
+    /**
+     * inherited method
+     *
+     */
     override fun onDraw(canvas: Canvas) {
         super.onDraw(canvas)
         if(points.size==0){
-            initalizePointsBy(canvas,lockType)
+            initializePointsBy(canvas,lockType)
         }
         if(shouldShowTrajectoryLines) {
             drawLines(canvas, selectedPoints, with_lastline = true)
@@ -620,12 +1350,24 @@ class PatternLockView : View ,View.OnTouchListener {
         drawPoints(canvas,points)
     }
 
-    
+    /**
+     * calculate distance between pattern points and position you touched , and judge whether position you touched is in boundary of each pattern points or not
+     * @param x x-axis position you touched
+     * @param y y-axis position you touched
+     * @param targetPoint pre-defined pivot position(e.g. one of pattern points)
+     * @param radius boundary distance between center of [targetPoint] and boundary of [targetPoint] for judgement
+     * @return true or false, if(true) then it means dissolved position (x,y) is in boundary of [targetPoint]
+     */
     protected fun calculateArea(x:Float,y:Float,targetPoint:Pair<Float,Float>,radius:Float):Boolean{
         return ( Math.pow((targetPoint.first-x).toDouble(),2.0)+Math.pow((targetPoint.second-y).toDouble(),2.0))<=Math.pow(radius.toDouble(),2.0)
     }
 
-    
+    /**
+     * check whether index of one of pattern points is in list of selected points(a.k.a. [selectedPoints]))
+     * @param index index value of list of pattern points
+     *
+     * @return true or false, if(true) then it means that dissolved point is in list of selected points
+     */
     protected fun checkIndexNumberExists(index:Int):Boolean{
         for(item in selectedPoints){
             if(index==item.second.first){
@@ -635,10 +1377,14 @@ class PatternLockView : View ,View.OnTouchListener {
         return false
     }
 
-    
+    /**
+     * inherited method
+     * this method is for touch event
+     */
     override fun onTouch(v: View, event: MotionEvent): Boolean {
         val x = event.x
         val y = event.y
+        //debug code
         /*val actionString = when(event.actionMasked){
             MotionEvent.ACTION_DOWN->{
                 "ACTION_DOWN"
@@ -684,24 +1430,37 @@ class PatternLockView : View ,View.OnTouchListener {
         }
         android.util.Log.e("onTouch",event.action.toString()+"  "+event.actionMasked.toString()+" "+actionString)
         */
+        if(isReadOnlyMode){
+            return true
+        }
         when( event.actionMasked){
             MotionEvent.ACTION_DOWN , MotionEvent.ACTION_MOVE, MotionEvent.ACTION_HOVER_ENTER
                 ,MotionEvent.ACTION_HOVER_MOVE, MotionEvent.ACTION_SCROLL,MotionEvent.ACTION_BUTTON_PRESS
             , MotionEvent.ACTION_POINTER_DOWN
             -> {
+                /**
+                 * start or continue draw pattern
+                 */
                 synchronized(selectedPointsLocker){
                     canCollectSelectedPoints = true
                 }
                 secondHandler.post {
+                    /**
+                     * check in background thread
+                     */
                     val cpX = x
                     val cpY = y
-                    val startSearchingTime = System.currentTimeMillis()
+                    val startSearchingTime = System.nanoTime()
+
+                    System.nanoTime()
                     var isFoundAvailablePoint = false
                     for (i in points.indices) {
                         val item = points[i]
                         val index_number = item.first
                         val area = item.second
-
+                        if(isReadOnlyMode){
+                            break
+                        }
                         if (calculateArea(
                                 cpX,
                                 cpY,
@@ -726,6 +1485,9 @@ class PatternLockView : View ,View.OnTouchListener {
 
                                     }
                                     else if(selectedPoints.size>1){
+                                        /**
+                                         * sort list of selected point due to synchronizing sequence
+                                         */
                                         selectedPoints.sortedBy {  it.first}
                                     }
 
@@ -735,15 +1497,15 @@ class PatternLockView : View ,View.OnTouchListener {
                         }
                     }
                     if(isFoundAvailablePoint){
-                        handler.post {
+                        mainHandler.post {
                             invalidate()
                         }
                     }
                     //invalidate()
                 }
-                if(selectedPoints.size>0){
+                if(selectedPoints.size>0&&!isReadOnlyMode){
                     floatingPoint = Pair<Float,Float>(x,y)
-                    handler.post {
+                    mainHandler.post {
                         invalidate()
                     }
                 }
@@ -759,8 +1521,11 @@ class PatternLockView : View ,View.OnTouchListener {
                     invalidate()
                 }*/
                 floatingPoint?.also {
+                    /**
+                     * user do not touch any of this view, so release drawing pattern
+                     */
                     floatingPoint = null
-                    handler.post {
+                    mainHandler.post {
                         invalidate()
                     }
                 }
@@ -774,6 +1539,10 @@ class PatternLockView : View ,View.OnTouchListener {
                         cloneSelectedPoints
                     )}
                         ?:run{
+                            /**
+                             * this view is not manipulated or managed by data controller or activity or fragment
+                             * so reset selected points self
+                             */
                             resetSelectedPoints(force=true)
                         }
                 }

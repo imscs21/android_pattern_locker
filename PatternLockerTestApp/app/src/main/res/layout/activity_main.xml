@@ -29,8 +29,10 @@
         app:spacingSizeIfWrapContent="100dp"
         app:spacingTypeIfWrapContent="total"
         app:indicatorColor="@color/purple_700"
+        app:indicatorErrorColor="#F45079"
         app:indicatorRadius="6dp"
         app:trajectoryLineColor="@color/teal_200"
+        app:trajectoryLineErrorColor="#F38BA0"
         app:trajectoryLineThickness="5dp"
         app:showTrajectoryLines="true"
         app:useVibratorIfAvailable="true"
@@ -47,6 +49,14 @@
         app:layout_constraintRight_toRightOf="parent"
         app:layout_constraintTop_toBottomOf="@+id/pattern_lock_view"
         >
+        <androidx.appcompat.widget.AppCompatButton
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="force\nerror"
+            android:id="@+id/button_use_error"
+            android:layout_gravity="center_vertical"
+            android:layout_weight="1"
+            />
         <androidx.appcompat.widget.AppCompatButton
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"

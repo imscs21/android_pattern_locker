@@ -2,6 +2,11 @@ package com.github.imscs21.pattern_locker.utils
 
 import com.github.imscs21.pattern_locker.views.PatternLockerDataController
 
+/**
+ * Not currently used
+ * @author imscs21
+ * @since 2022-11-1
+ */
 data class ThreadLockerPackage
     (
     protected var _exitFlag:Boolean = false,

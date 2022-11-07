@@ -15,3 +15,5 @@ dependencyResolutionManagement {
 }
 rootProject.name = "pattern_locker"
 include ':app'
+//project(':testrunapp').projectDir = new File(rootDir, 'PatternLockerTestApp/app/')
+//include ':testrunapp'
