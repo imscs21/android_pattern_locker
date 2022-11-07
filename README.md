@@ -24,7 +24,7 @@ Pattern Locker Library for android
 2. add dependencies in your 'app/build.gradle'
     ```
     dependencies {
-        implementation 'com.github.imscs21:android_pattern_locker:0.2.1'
+        implementation 'com.github.imscs21:android_pattern_locker:v0.2.1'
         ...
     }
     ```
