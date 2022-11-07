@@ -1,9 +1,11 @@
 # android_pattern_locker
 Pattern Locker Library for android
 
-<img width="32%" height="auto" src="screenshots/demo.gif">
+<div>
+<img align='left' width="32%" height="auto" src="screenshots/demo.gif">
 <img  width="32%" height="auto" src="screenshots/democapture1.png">
-<img  width="32%" height="auto" src="screenshots/democapture2.png">
+<img align='right' width="32%" height="auto" src="screenshots/democapture2.png">
+</div>
 <div>
 </div>
 
