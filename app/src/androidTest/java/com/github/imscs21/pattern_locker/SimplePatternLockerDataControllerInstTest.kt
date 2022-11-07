@@ -43,7 +43,7 @@ class SimplePatternLockerDataControllerInstTest {
                 val selectedPoints = ArrayList<SelectedPointItem>()
                 val randInts = IntArray(10, { Random.nextInt(2, tmpList.size / 2 - 1) })
                 for(ri in randInts){
-                    tmpList.sort()
+                    tmpList.shuffle()
                     selectedPoints.clear()
                     for(i in 0 until ri){
                         selectedPoints.add(SelectedPointItem(i.toLong(), PointItem(tmpList[i], Position(23f,43f))))
