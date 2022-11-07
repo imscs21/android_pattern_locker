@@ -24,7 +24,7 @@ Pattern Locker Library for android
 2. add dependencies in your 'app/build.gradle'
     ```
     dependencies {
-        implementation 'com.github.imscs21:android_pattern_locker:0.1.0re2'
+        implementation 'com.github.imscs21:android_pattern_locker:0.2.0'
         ...
     }
     ```
@@ -163,13 +163,71 @@ val dataController = dataControllerFactory.build(context,dataStorageBehavior)
 ```
 
 #### 3.2. Simple Data Storage Behavior 
-This is pre-defined StorageBehavior.
+This is pre-defined StorageBehavior.    
 But There are weak points due to md5 hashing. 
 ```
 val simpleBehavior = PatternLockerDataController.SimpleDataStorageBehavior(this)
 val dataControllerFactory = PatternLockerDataController.PatternLockerDataControllerFactory.getInstance()
 val patternDataContoller = dataControllerFactory.build<String>(this,simpleBehavior)
 ```
+
+#### 3.3. Implement your own index number
+
+```
+patternLockView.apply {
+    onCalculateCustomPointOfPatternListener = object : PatternLockView.OnCalculateCustomIndexOfPointOfPatternListener{
+        override fun getPointIndex(originalIndex: Int, pointPosition: Position): Int {
+            //this is example of custom index
+            //returned value must be positive integer.
+            val useCustomIndex:Boolean = true
+            if(useCustomIndex){
+                return 2*originalIndex - 1
+            }
+            else{
+                return originalIndex
+            }
+        }
+
+    }
+}
+```
+
+#### 3.4. Implement your own custom pattern shape
+This can be available in only kotlin
+```
+patternLockView.apply {
+    onCalculateCustomShapePositionListener =
+        object : PatternLockView.OnCalculateCustomShapePositionListener {
+            override fun onCalculateCustomShape(
+                canvasWidth: Int,
+                canvasHeight: Int,
+                directCanvas: Canvas?,
+                pointsOfPatternContainer: ArrayList<PointItem>,
+                pointsOfPatternContainerMaxLength: UInt,
+                pointRadius: Float,
+                spacingValuesIfWrapContent: Pair<PatternLockView.SpacingTypeIfWrapContent, Float>,
+                isPointContainerClearedBeforeThisMethod: Boolean,
+                customParams: Any?
+            ) {
+                //this is example of custom shape
+                val cx = canvasWidth / 2.0f
+                val cy = canvasHeight / 2.0f
+                pointsOfPatternContainer.add(PointItem(1, Position(cx, cy)))
+                pointsOfPatternContainer.add(PointItem(2, Position(5*pointRadius, cy)))
+                pointsOfPatternContainer.add(
+                    PointItem(
+                        3,
+                        Position(canvasWidth - 5*pointRadius, cy)
+                    )
+                )
+            }
+
+        }
+    setLockTypes(PatternLockView.LockType.CUSTOM)
+}
+```
+
+
 
 ### 4. Reset drawn pattern
 ```
