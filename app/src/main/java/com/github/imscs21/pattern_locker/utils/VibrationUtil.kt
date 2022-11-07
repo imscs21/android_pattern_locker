@@ -127,14 +127,22 @@ class VibrationUtil {
      * @param amplitude strength of vibration if available
      */
     public fun vibrate(milliseconds:Long,amplitude:Int){
-        vibrationUnit?.vibrate(milliseconds, amplitude)
+        try {
+            vibrationUnit?.vibrate(milliseconds, amplitude)
+        }catch(e:Exception){
+
+        }
     }
 
     /**
      * pre-defined behavior of device vibration function when clicking something in app with different api methods capability
      */
     public fun vibrateAsClick(){
-        vibrationUnit?.vibrateAsClick()
+        try {
+            vibrationUnit?.vibrateAsClick()
+        }catch(e:Exception){
+
+        }
     }
 
 }
