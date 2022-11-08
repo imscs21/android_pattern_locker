@@ -773,7 +773,7 @@ class PatternLockView : View ,View.OnTouchListener {
             }
             if(useInnerManagementAlgorithm){//it will be spent more time if enabled
                 val point_radius = pointRadius
-                val divideUnit = sqrt(point_radius).toFloat()+1
+                val divideUnit = point_radius/2+1
                 val checkBetweenTwoLists:(List<PointItem>,List<PointItem>)->(Boolean) =  { x1,x2->
                     var result = true
                     var canContinueCheck = true
@@ -816,7 +816,7 @@ class PatternLockView : View ,View.OnTouchListener {
                                             item2.first,
                                             item2.second,
                                             item1,
-                                            point_radius
+                                            2*pointRadius
                                         )
                                     ) {
                                         cnt++
@@ -880,7 +880,7 @@ class PatternLockView : View ,View.OnTouchListener {
                             val item1 = it.second
                             for(j in current_group.indices){
                                 val item2 = current_group[j].second
-                                if(calculateArea(item2.first,item2.second,item1,point_radius)){
+                                if(calculateArea(item2.first,item2.second,item1,2*pointRadius)){
                                     cnt++
                                 }
                             }
