@@ -795,7 +795,8 @@ class PatternLockView : View ,View.OnTouchListener {
                 }
                 val searchRow:(List<PointItem>)->(ArrayList<PointItem>)= {
                     val group2 = it.groupBy { (it.second.first/divideUnit).toInt() }
-                    val group_ids2 = group2.keys.toList()
+                    val _group_ids2 = group2.keys.toList()
+                    val group_ids2 = _group_ids2.sortedBy { it }
                     val tmp_list = ArrayList<PointItem>()
                     var previous_group:List<PointItem>? = group2.get(group_ids2[0])!!
                     if(group_ids2.size>1) {
@@ -864,7 +865,8 @@ class PatternLockView : View ,View.OnTouchListener {
                 //val point_radius = pointRadius
 
                 val group = points.groupBy { (it.second.second/divideUnit).toInt() }
-                val group_ids = group.keys.toList()
+                val _group_ids = group.keys.toList()
+                val group_ids = _group_ids.sortedBy { it }
                 //points.clear()
                 if(group_ids.size>1) {
                     val tmp_list = ArrayList<PointItem>()
