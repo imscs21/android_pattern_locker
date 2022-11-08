@@ -6,7 +6,9 @@
             <flag name="total" value="1"/>
             <flag name="fixed" value="2"/>
         </attr>
-
+        <attr name="pointBlurColor" format="color|reference" />
+        <attr name="pointBlurDx" format="dimension|reference" />
+        <attr name="pointBlurDy" format="dimension|reference"/>
         <attr name="indicatorColor" format="color|reference" />
         <attr name="indicatorErrorColor" format="color|reference" />
         <attr name="indicatorRadius" format="dimension|reference"/>

@@ -35,7 +35,7 @@ Pattern Locker Library for android
 2. add dependencies in your 'app/build.gradle'
     ```
     dependencies {
-        implementation 'com.github.imscs21:android_pattern_locker:v0.3.0'
+        implementation 'com.github.imscs21:android_pattern_locker:v0.3.1'
         ...
     }
     ```
@@ -57,6 +57,9 @@ Pattern Locker Library for android
         app:indicatorColor="#80ff80"
         app:indicatorErrorColor="#F45079"
         app:indicatorRadius="6dp"
+        app:pointBlurColor="#808080"
+        app:pointBlurDx="1px"
+        app:pointBlurDy="1px"
         app:trajectoryLineColor="#ff8080"
         app:trajectoryLineErrorColor="#F38BA0"
         app:trajectoryLineThickness="5dp"
@@ -134,9 +137,9 @@ patternLockView.onTaskPatternListener = object:PatternLockView.OnTaskPatternList
 ```
 
 #### 3.0. Hierarchical relation of pattern points instance
+![Comprehension image](screenshots/dia1.png)
 ```
 Position = Pair<Float,Float>//x,y position values
-
 
 PointItem = Pair<Int,Position>//pointID(index)number,Point Position
 
@@ -205,7 +208,7 @@ patternLockView.apply {
     onCalculateCustomPointOfPatternListener = object : PatternLockView.OnCalculateCustomIndexOfPointOfPatternListener{
         override fun getPointIndex(originalIndex: Int, pointPosition: Position): Int {
             //this is example of custom index
-            //returned value must be positive integer.
+            //returned value must be positive integer if you using 'PatternLockerDataController.SimpleDataStorageBehavior'.
             val useCustomIndex:Boolean = true
             if(useCustomIndex){
                 return 2*originalIndex - 1
@@ -269,7 +272,7 @@ patternLockView.resetSelectedPoints(force = true,invalidateView = true)
 patternDataContoller?.resetPattern()
 ```
 
-### 5. How to use error indicator
+### 6. How to use error indicator
 ```
 patternLockView.apply {
     isReadOnlyMode = true

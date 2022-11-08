@@ -23,7 +23,7 @@ class SimplePatternLockerDataControllerInstTest {
     fun useAppContext() {
         // Context of the app under test.
         val appContext = InstrumentationRegistry.getInstrumentation().targetContext
-        Assert.assertEquals("com.github.imscs21.pattern_locker", appContext.packageName)
+        //Assert.assertEquals("com.github.imscs21.pattern_locker", appContext.packageName)
         patternLockerDataController = PatternLockerDataController.SimpleDataStorageBehavior(appContext.applicationContext)
         Assert.assertNotNull(patternLockerDataController)
         patternLockerDataController?.let {controller->

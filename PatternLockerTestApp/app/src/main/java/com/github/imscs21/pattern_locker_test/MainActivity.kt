@@ -1,6 +1,7 @@
 package com.github.imscs21.pattern_locker_test
 
 import android.content.Context
+import android.graphics.Canvas
 import androidx.appcompat.app.AppCompatActivity
 import android.os.Bundle
 import android.view.View
@@ -13,6 +14,7 @@ import androidx.appcompat.widget.AppCompatSpinner
 import com.github.imscs21.pattern_locker_test.R
 import com.github.imscs21.pattern_locker.views.PatternLockView
 import com.github.imscs21.pattern_locker.views.PatternLockerDataController
+import com.github.imscs21.pattern_locker.views.PointItem
 import com.github.imscs21.pattern_locker.views.SelectedPointItem
 import com.google.android.material.switchmaterial.SwitchMaterial
 
@@ -56,7 +58,24 @@ class MainActivity : AppCompatActivity() {
             }
         }
         forceErrorButton.setOnClickListener {
-            patternLockView.turnErrorIndicator(true, semiAutoTurningOffMills = 4000)
+
+            patternLockView.apply {
+
+                isReadOnlyMode = true
+                patternLockView.turnErrorIndicator(
+                    true,
+                    invalidateView = true,
+                    semiAutoTurningOffMills = 4000
+                )
+                onTurnOffErrorIndicatorListener =
+                    object : PatternLockView.OnTurnOffErrorIndicatorListener {
+                        override fun onTurnOff(view: PatternLockView, fromDelayedTime: Boolean) {
+                            if (fromDelayedTime) {
+                                view.isReadOnlyMode = false
+                            }
+                        }
+                    }
+            }
         }
         patternDataContoller = PatternLockerDataController.PatternLockerDataControllerFactory.getInstance().build<String>(this,PatternLockerDataController.SimpleDataStorageBehavior(this))
         patternDataContoller.onCheckingSelectedPointsListener = object:PatternLockerDataController.OnCheckingSelectedPointsListener{

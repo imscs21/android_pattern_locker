@@ -74,7 +74,10 @@ class PatternLockView : View ,View.OnTouchListener {
         public fun getSpacingCount():Int
 
     }
-
+    public interface OnFinishInitializePoints{
+        public fun onFinished(view:PatternLockView)
+    }
+    //public var onFinishInitializePoints:OnFinishInitializePoints? = null //for instrument test
     /**
      * callback listener for turning off error indicator
      */
@@ -232,6 +235,11 @@ class PatternLockView : View ,View.OnTouchListener {
      * if property value is null, it would be non-touched
      */
     protected var floatingPoint:Pair<Float,Float>? = null
+
+    /**
+     * flag whether using CheckAlgorithm in CustomShape or not
+     */
+    public var useCheckAlgorithmInCustomShape:Boolean = false
 
     /**
      * canvas paint instance of trajectory lines
@@ -721,6 +729,13 @@ class PatternLockView : View ,View.OnTouchListener {
     public fun switchPattern(lockType: LockType){
         setLockTypes(lockType,invalidateView = true)
     }
+
+    /**
+     * this is for instrumented test
+     */
+    public fun getTotalNumberOfPatternPoints():Int{
+        return points?.let{it.size}?:run{-1}
+    }
     /**
      * initialize [points] and calculate positions of pattern points as developer custom shape pattern
      * @param canvas [Canvas] class to obtain canvas width and height
@@ -731,9 +746,9 @@ class PatternLockView : View ,View.OnTouchListener {
         if(doClearPoints) {
             points.clear()
         }
-        val maxPointSize = 5000
+        val maxPointSize = 10000
         val doCheckBoundary = true
-        val useInnerManagementAlgorithm = true
+        val useInnerManagementAlgorithm = useCheckAlgorithmInCustomShape//true //disabled in rc0
         onCalculateCustomShapePositionListener?.let {
             it.onCalculateCustomShape(canvasHeight = canvas.height,
                 canvasWidth = canvas.width,
@@ -772,6 +787,7 @@ class PatternLockView : View ,View.OnTouchListener {
 
             }
             if(useInnerManagementAlgorithm){//it will be spent more time if enabled
+                try{
                 val point_radius = pointRadius
                 val divideUnit = point_radius/2+1
                 val checkBetweenTwoLists:(List<PointItem>,List<PointItem>)->(Boolean) =  { x1,x2->
@@ -793,7 +809,7 @@ class PatternLockView : View ,View.OnTouchListener {
                     }
                      result
                 }
-                val searchRow:(List<PointItem>)->(ArrayList<PointItem>)= {
+                val searchSecond:(List<PointItem>)->(ArrayList<PointItem>)= {
                     val group2 = it.groupBy { (it.second.first/divideUnit).toInt() }
                     val _group_ids2 = group2.keys.toList()
                     val group_ids2 = _group_ids2.sortedBy { it }
@@ -893,19 +909,30 @@ class PatternLockView : View ,View.OnTouchListener {
                     previous_group?.let{
                         tmp_list.addAll(it)
                     }
-                    var tmp = searchRow(tmp_list)
+                    var tmp = searchSecond(tmp_list)
                     //points.addAll(tmp_list)
-                    points.clear()
-                    points = tmp
+                    tmp?.let {
+                        if(it.size>0) {
+                            points?.clear()
+                            points = it
+                        }
+                    }
                 }
                 else if(group_ids.size==1){
-                    points.clear()
-                    points = searchRow(group.get(group_ids[0])!!)
+                    searchSecond(group.get(group_ids[0])!!)?.let{
+                        if(it.size>0){
+                            points?.clear()
+                            points = it
+                        }
+                    }
+
                 }
                 else{
 
                 }
+                }catch(e:Exception){
 
+                }
             }
 
         }
@@ -970,13 +997,13 @@ class PatternLockView : View ,View.OnTouchListener {
         val width = canvas.width
         val commonSize = min(max(0,width- (paddingLeft + paddingRight)),max(height - (paddingTop + paddingBottom),0))
 
-        val yOffset = height/2
+        val yOffset = height/2 + 2*pointRadius
         val xOffset = width/2
 
         /**
          * outer pentagon shape radius
          */
-        val radius = commonSize/2.0f - pointRadius
+        val radius = commonSize/2.0f - 2*pointRadius
         var index = 0
         if(useHighDensity){
             /**
@@ -1135,7 +1162,7 @@ class PatternLockView : View ,View.OnTouchListener {
         val commonSize = min(max(0,width- (paddingLeft + paddingRight)),max(height - (paddingTop + paddingBottom),0))
         val yOffset = height/2
         val xOffset = width/2
-        val radius = commonSize/2.0f - pointRadius
+        val radius = commonSize/2.0f - 2*pointRadius
         var index = 0
         if(useHighDensity){
             //canvas.drawCircle(cx.toFloat(),cy.toFloat(),100f,tmpPaint)
@@ -1148,7 +1175,8 @@ class PatternLockView : View ,View.OnTouchListener {
             val halfRadius = getHalfRadius(radius,60.0)//(radius*sin(Math.toRadians(60.0))).toFloat()
             val halfOuterRadius = (halfRadius/ cos(Math.toRadians(10.0))).toFloat()
             val middleHalfRadius = getHalfRadius((2*radius)/3.0f,60.0)
-            for(i in 0 until 360 step 60){
+            val stepSize = 60
+            for(i in 0 until 360 step stepSize){
                 /**
                  * position of outer point
                  */
@@ -1169,18 +1197,18 @@ class PatternLockView : View ,View.OnTouchListener {
                 /**
                  * center(a.k.a. average(?)) position of positions between two adjacent outer peak points
                  */
-                val py_half = ((sin(Math.toRadians((i+30)%360+0.0)).toFloat())*middleHalfRadius)+yOffset
-                val px_half = ((cos(Math.toRadians((i+30)%360+0.0)).toFloat())*middleHalfRadius)+xOffset
+                val py_half = ((sin(Math.toRadians((i+stepSize/2)%360+0.0)).toFloat())*middleHalfRadius)+yOffset
+                val px_half = ((cos(Math.toRadians((i+stepSize/2)%360+0.0)).toFloat())*middleHalfRadius)+xOffset
 
                 /**
                  * center(a.k.a. average(?)) position of positions between two adjacent outer peak points
                  */
-                val outer_offset_angle = 20
+                val outer_offset_angle = stepSize/3
                 val py_outer_half1 = ((sin(Math.toRadians((i+outer_offset_angle)%360+0.0)).toFloat())*halfOuterRadius)+yOffset
                 val px_outer_half1 = ((cos(Math.toRadians((i+outer_offset_angle)%360+0.0)).toFloat())*halfOuterRadius)+xOffset
 
-                val py_outer_half2 = ((sin(Math.toRadians((i+(60-outer_offset_angle))%360+0.0)).toFloat())*halfOuterRadius)+yOffset
-                val px_outer_half2 = ((cos(Math.toRadians((i+(60-outer_offset_angle))%360+0.0)).toFloat())*halfOuterRadius)+xOffset
+                val py_outer_half2 = ((sin(Math.toRadians((i+(stepSize-outer_offset_angle))%360+0.0)).toFloat())*halfOuterRadius)+yOffset
+                val px_outer_half2 = ((cos(Math.toRadians((i+(stepSize-outer_offset_angle))%360+0.0)).toFloat())*halfOuterRadius)+xOffset
 
                 val pts1 = Position(px,py)
                 val pts2 = Pair<Float,Float>(px2,py2)
@@ -1216,8 +1244,10 @@ class PatternLockView : View ,View.OnTouchListener {
             /**
              * inner hexagon shape radius
              */
-            val halfRadius = (radius*sin(Math.toRadians(60.0))).toFloat()
-            for(i in 0 until 360 step 60){
+            val stepSize = 60
+            val halfRadius = (radius*sin(Math.toRadians((180.0-stepSize.toDouble())/2.0))).toFloat()
+
+            for(i in 0 until 360 step stepSize){
                 /**
                  * position of outer point
                  */
@@ -1231,8 +1261,8 @@ class PatternLockView : View ,View.OnTouchListener {
                 /**
                  * center(a.k.a. average(?)) position of positions between two adjacent outer peak points
                  */
-                val py_half = ((sin(Math.toRadians((i+30)%360+0.0)).toFloat())*halfRadius)+yOffset
-                val px_half = ((cos(Math.toRadians((i+30)%360+0.0)).toFloat())*halfRadius)+xOffset
+                val py_half = ((sin(Math.toRadians((i+stepSize/2)%360+0.0)).toFloat())*halfRadius)+yOffset
+                val px_half = ((cos(Math.toRadians((i+stepSize/2)%360+0.0)).toFloat())*halfRadius)+xOffset
 
                 val pts1 = Position(px,py)
                 val pts2 = Pair<Float,Float>(px2,py2)
@@ -1256,7 +1286,12 @@ class PatternLockView : View ,View.OnTouchListener {
             //canvas.drawPath(outerPaths,tmpPaint)
         }
     }
-
+    /*
+    public fun doInitPts4InstTest():Int{
+        initializePointsBy(Canvas(Bitmap.createBitmap((dip1*500).toInt(),(dip1*500).toInt(),Bitmap.Config.ALPHA_8)),lockType)
+        return getTotalNumberOfPatternPoints()
+    }
+    */
     /**
      * initialize positions of pattern points by lockType
      * @param canvas view canvas
@@ -1305,6 +1340,7 @@ class PatternLockView : View ,View.OnTouchListener {
 
             }
         }
+        //onFinishInitializePoints?.onFinished(this)
     }
 
     /**
@@ -1441,15 +1477,15 @@ class PatternLockView : View ,View.OnTouchListener {
 
         try {
             var attr_indicator_blur_color = attributes.getColor(
-                R.styleable.PatternLockView_trajectoryLineErrorColor,
+                R.styleable.PatternLockView_pointBlurColor,
                 indicatorBlurColor
             )
             var attr_indicator_blur_dx = attributes.getDimension(
-                R.styleable.PatternLockView_trajectoryLineErrorColor,
+                R.styleable.PatternLockView_pointBlurDx,
                 indicatorBlurDx
             )
             var attr_indicator_blur_dy = attributes.getDimension(
-                R.styleable.PatternLockView_trajectoryLineErrorColor,
+                R.styleable.PatternLockView_pointBlurDy,
                 indicatorBlurDy
             )
 

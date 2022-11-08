@@ -29,7 +29,11 @@
         app:spacingSizeIfWrapContent="100dp"
         app:spacingTypeIfWrapContent="total"
         app:indicatorColor="@color/purple_700"
-        app:indicatorErrorColor="#F45079"
+        app:indicatorErrorColor="#ff1003"
+        app:pointBlurColor="#808080"
+        app:pointBlurDx="1dip"
+        app:pointBlurDy="1dip"
+
         app:indicatorRadius="6dp"
         app:trajectoryLineColor="@color/teal_200"
         app:trajectoryLineErrorColor="#F38BA0"
