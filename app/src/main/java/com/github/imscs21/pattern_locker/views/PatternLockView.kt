@@ -7,7 +7,6 @@ import android.graphics.Canvas
 import android.util.AttributeSet
 import android.util.TypedValue
 import android.view.*
-import kotlin.math.min
 import android.graphics.*
 import android.os.*
 import android.widget.Toast
@@ -20,9 +19,7 @@ import kotlinx.coroutines.selects.select
 import java.util.PriorityQueue
 import java.util.concurrent.Executor
 import java.util.concurrent.locks.Lock
-import kotlin.math.cos
-import kotlin.math.max
-import kotlin.math.sin
+import kotlin.math.*
 
 /**
  * Pattern View
@@ -75,6 +72,7 @@ class PatternLockView : View ,View.OnTouchListener {
          * this method is used to calculate spacing size when type of SpacingTypeIfWrapContent is total
          */
         public fun getSpacingCount():Int
+
     }
 
     /**
@@ -254,6 +252,21 @@ class PatternLockView : View ,View.OnTouchListener {
      * handler from other thread(a.k.a. multithreading handler)
      */
     protected lateinit var secondHandler:Handler
+
+    /**
+     * indicatorBlurDx
+     */
+    protected var indicatorBlurDx:Float = 1f
+
+    /**
+     * indicatorBlurDy
+     */
+    protected  var indicatorBlurDy:Float = 1f
+
+    /**
+     * indicatorBlurColor
+     */
+    protected var indicatorBlurColor:Int = Color.GRAY
 
     /**
      * color property of pattern point
@@ -606,13 +619,13 @@ class PatternLockView : View ,View.OnTouchListener {
                 6
             }
             LockType.HEXAGON_HIGH_DENSITY ->{
-                6
+                8
             }
             LockType.PENTAGON_DEFAULT ->{
                 6
             }
             LockType.PENTAGON_HIGH_DENSITY->{
-                6
+                8
             }
             LockType.CUSTOM->{
                 onCalculateCustomShapePositionListener?.let{
@@ -718,8 +731,9 @@ class PatternLockView : View ,View.OnTouchListener {
         if(doClearPoints) {
             points.clear()
         }
-        val maxPointSize = 4000
+        val maxPointSize = 5000
         val doCheckBoundary = true
+        val useInnerManagementAlgorithm = true
         onCalculateCustomShapePositionListener?.let {
             it.onCalculateCustomShape(canvasHeight = canvas.height,
                 canvasWidth = canvas.width,
@@ -743,7 +757,6 @@ class PatternLockView : View ,View.OnTouchListener {
                 }
             }
             if(doCheckBoundary){//it takes more time
-
                 val tmp = points.filter{
                    val position = it.second
                     if(0<=position.first && position.first <= canvas.width
@@ -756,6 +769,140 @@ class PatternLockView : View ,View.OnTouchListener {
                 }
                 points.clear()
                 points.addAll(tmp)
+
+            }
+            if(useInnerManagementAlgorithm){//it will be spent more time if enabled
+                val point_radius = pointRadius
+                val divideUnit = sqrt(point_radius).toFloat()+1
+                val checkBetweenTwoLists:(List<PointItem>,List<PointItem>)->(Boolean) =  { x1,x2->
+                    var result = true
+                    var canContinueCheck = true
+                    for(i in x1.indices){
+                        val item1 = x1[i].second
+                        for(j in x2.indices){
+                            val item2 = x2[j].second
+                            if(!calculateArea(item2.first,item2.second,item1,point_radius)){
+                                canContinueCheck = false
+                                 result = false
+                                break
+                            }
+                        }
+                        if(!canContinueCheck){
+                            break
+                        }
+                    }
+                     result
+                }
+                val searchRow:(List<PointItem>)->(ArrayList<PointItem>)= {
+                    val group2 = it.groupBy { (it.second.first/divideUnit).toFloat() }
+                    val group_ids2 = group2.keys.toList()
+                    val tmp_list = ArrayList<PointItem>()
+                    var previous_group:List<PointItem>? = group2.get(group_ids2[0])!!
+                    if(group_ids2.size>1) {
+                        previous_group = null
+                        tmp_list.clear()
+                        previous_group = group2.get(group_ids2[0])!!
+                        for (k in 1 until group_ids2.size) {
+
+                            val current_group = group2.get(group_ids2[k])!!
+
+                            previous_group = previous_group!!.filter {
+                                var cnt = 0
+                                val item1 = it.second
+                                for (j in current_group.indices) {
+                                    val item2 = current_group[j].second
+                                    if (calculateArea(
+                                            item2.first,
+                                            item2.second,
+                                            item1,
+                                            point_radius
+                                        )
+                                    ) {
+                                        cnt++
+                                    }
+                                }
+                                cnt == 0
+                            }
+                            previous_group?.let{tmp_list.addAll(it)}
+
+                            previous_group = current_group
+                        }
+                        previous_group?.let {
+                            tmp_list.addAll(it)
+                        }
+                    }
+
+                    else if(group_ids2.size==1){
+                        val grp = group2.get(group_ids2[0])!!
+                        for(i in grp.indices){
+                            var cnt = 0
+                            val item1 = grp[i].second
+                            for(j in i+1 until grp.size){
+                                val item2 = grp[j].second
+                                if (calculateArea(
+                                        item2.first,
+                                        item2.second,
+                                        item1,
+                                        point_radius
+                                    )
+                                ) {
+                                    cnt++
+                                }
+                            }
+                            if(cnt==0){
+                                tmp_list.add(grp[i])
+                            }
+                        }
+                    }
+                    else{
+                        tmp_list.addAll(it)
+                    }
+                    tmp_list
+                }
+
+                //points.sortBy { it.second.first }
+                //val point_radius = pointRadius
+
+                val group = points.groupBy { (it.second.second/divideUnit).toFloat() }
+                val group_ids = group.keys.toList()
+                //points.clear()
+                if(group_ids.size>1) {
+                    val tmp_list = ArrayList<PointItem>()
+                    var previous_group:List<PointItem>? = group.get(group_ids[0])!!
+                    for (k in 1 until group_ids.size) {
+
+                        val current_group = group.get(group_ids[k])!!
+
+                        previous_group = previous_group!!.filter{
+                            var cnt = 0
+                            val item1 = it.second
+                            for(j in current_group.indices){
+                                val item2 = current_group[j].second
+                                if(calculateArea(item2.first,item2.second,item1,point_radius)){
+                                    cnt++
+                                }
+                            }
+                            cnt==0
+                        }
+                        tmp_list.addAll(previous_group!!)
+
+                        previous_group = current_group
+                    }
+                    previous_group?.let{
+                        tmp_list.addAll(it)
+                    }
+                    var tmp = searchRow(tmp_list)
+                    //points.addAll(tmp_list)
+                    points.clear()
+                    points = tmp
+                }
+                else if(group_ids.size==1){
+                    points.clear()
+                    points = searchRow(group.get(group_ids[0])!!)
+                }
+                else{
+
+                }
 
             }
 
@@ -1216,6 +1363,7 @@ class PatternLockView : View ,View.OnTouchListener {
             }
             selectedPointColor = def_color
             selectedPointErrorColor = Color.RED
+
             this.color = def_color
             this.strokeCap = Paint.Cap.ROUND
             this.strokeWidth = 3*dip1//pointRadius/3
@@ -1240,7 +1388,10 @@ class PatternLockView : View ,View.OnTouchListener {
         }
         pointErrorColor = Color.MAGENTA
         pointPaint.apply{
-            this.setShadowLayer(dip1,1f,1f,Color.GRAY)
+            indicatorBlurColor = Color.GRAY
+            indicatorBlurDx = 1f
+            indicatorBlurDy = 1f
+            this.setShadowLayer(dip1,indicatorBlurDx,indicatorBlurDy,indicatorBlurColor)
             this.color = pointColor
             this.isAntiAlias = true
         }
@@ -1286,7 +1437,27 @@ class PatternLockView : View ,View.OnTouchListener {
         var attr_trajectory_line_error_color = attributes.getColor(R.styleable.PatternLockView_trajectoryLineErrorColor,selectedPointErrorColor)
         selectedPointErrorColor = attr_trajectory_line_error_color
 
+        try {
+            var attr_indicator_blur_color = attributes.getColor(
+                R.styleable.PatternLockView_trajectoryLineErrorColor,
+                indicatorBlurColor
+            )
+            var attr_indicator_blur_dx = attributes.getDimension(
+                R.styleable.PatternLockView_trajectoryLineErrorColor,
+                indicatorBlurDx
+            )
+            var attr_indicator_blur_dy = attributes.getDimension(
+                R.styleable.PatternLockView_trajectoryLineErrorColor,
+                indicatorBlurDy
+            )
 
+            indicatorBlurColor = attr_indicator_blur_color
+            indicatorBlurDx = attr_indicator_blur_dx
+            indicatorBlurDy = attr_indicator_blur_dy
+            pointPaint.setShadowLayer(dip1, indicatorBlurDx, indicatorBlurDy, indicatorBlurColor)
+        }catch(e:Exception){
+
+        }
 
         val attr_pattern_type = attributes.getInt(R.styleable.PatternLockView_patternType,lockType.intValue)
         for(lt in LockType.values()){
@@ -1513,7 +1684,8 @@ class PatternLockView : View ,View.OnTouchListener {
                                         /**
                                          * sort list of selected point due to synchronizing sequence
                                          */
-                                        selectedPoints.sortedBy {  it.first}
+                                        selectedPoints.sortBy {  it.first}
+
                                     }
 
                                 }
