@@ -35,7 +35,7 @@ Pattern Locker Library for android
 2. add dependencies in your 'app/build.gradle'
     ```
     dependencies {
-        implementation 'com.github.imscs21:android_pattern_locker:v0.3.1'
+        implementation 'com.github.imscs21:android_pattern_locker:v0.3.2'
         ...
     }
     ```
@@ -86,55 +86,66 @@ Pattern Locker Library for android
     3. etc
 
 ## 3. In Kotlin
+1. setting basic attributes in codes
+    ```
+    patternLockView.useVibratorIfAvaliable = false
+    patternLockView.useTrajectoryLineShadow = false
+    patternLockView.shouldShowTrajectoryLines = false
+    patternLockView.setLockTypes(PatternLockView.LockType.SQUARE_3X3,invalidateView = true)
+    patternLockView.clickingJudgementPaddingRadius = 30f//dimension size(e.g. pixel size)
+    patternLockView.canPreventAbnormalJudgementPadding = true
+    patternLockView.useCheckAlgorithmInCustomShape = true
+    patternLockView.editMode = true // not using currently
+    patternLockView.onTaskPatternListener = ...
+    patternLockView.onCalculateCustomPointOfPatternListener = ...
+    patternLockView.onCalculateCustomShapePositionListener = ...
+    patternLockView.onTurnOffErrorIndicatorListener = ...
+    patternLockView.pointColor = ...
+    patternLockView.pointErrorColor = ...
+    patternLockView.selectedPointColor = ...
+    patternLockView.selectedPointErrorColor = ...
+    ```
 
-```
-//patternLockView = PatternLockView(context) //for initiate view in code
+2. setting controller and listeners
+    ```
+    //patternLockView = PatternLockView(context) //for initiate view in code
 
-//setting attributes in code
-patternLockView.useVibratorIfAvaliable = false
-patternLockView.useTrajectoryLineShadow = false
-patternLockView.shouldShowTrajectoryLines = false
-patternLockView.setLockTypes(PatternLockView.LockType.SQUARE_3X3,invalidateView = true)
-patternLockView.clickingJudgementPaddingRadius = 30f//dimension size(e.g. pixel size)
-patternLockView.editMode = true // not using currently
-patternLockView.onTaskPatternListener = ...
-
-//finish setting attributes in code
-
-val patternDataContoller = PatternLockerDataController.PatternLockerDataControllerFactory.getInstance().build<String>(this,PatternLockerDataController.SimpleDataStorageBehavior(this))
-        patternDataContoller.onCheckingSelectedPointsListener = object:PatternLockerDataController.OnCheckingSelectedPointsListener{
-            override fun onError(errorID: Int) {
-                patternLockView.resetSelectedPoints(force = true)
-            }
-
-            override fun onSuccess(result: Boolean) {
-                runOnUiThread {
-                    Toast.makeText(applicationContext,"check result is ${result}",Toast.LENGTH_SHORT).show()
+    val patternDataContoller = PatternLockerDataController.PatternLockerDataControllerFactory.getInstance().build<String>(this,PatternLockerDataController.SimpleDataStorageBehavior(this))
+            patternDataContoller.onCheckingSelectedPointsListener = object:PatternLockerDataController.OnCheckingSelectedPointsListener{
+                override fun onError(errorID: Int) {
                     patternLockView.resetSelectedPoints(force = true)
                 }
-            }
-        }
-patternLockView.onTaskPatternListener = object:PatternLockView.OnTaskPatternListener{
-            override fun onNothingSelected() {
 
-            }
-
-            override fun onFinishedPatternSelected(
-                view:PatternLockView,
-                editModeFromView: Boolean,
-                lockType: PatternLockView.LockType,
-                copiedSelectedPoints: ArrayList<SelectedPointItem>
-            ) {
-                if(editModeButton.isChecked){
-                    //in pattern edit mode
-                }
-                else{
-                    patternDataContoller.requestToCheckSelectedPoints(lockType, copiedSelectedPoints)
+                override fun onSuccess(result: Boolean) {
+                    runOnUiThread {
+                        Toast.makeText(applicationContext,"check result is ${result}",Toast.LENGTH_SHORT).show()
+                        patternLockView.resetSelectedPoints(force = true)
+                    }
                 }
             }
+    patternLockView.onTaskPatternListener = object:PatternLockView.OnTaskPatternListener{
+                override fun onNothingSelected() {
 
-        }
-```
+                }
+
+                override fun onFinishedPatternSelected(
+                    view:PatternLockView,
+                    editModeFromView: Boolean,
+                    lockType: PatternLockView.LockType,
+                    copiedSelectedPoints: ArrayList<SelectedPointItem>
+                ) {
+                    if(editModeButton.isChecked){
+                        //in pattern edit mode
+                    }
+                    else{
+                        patternDataContoller.requestToCheckSelectedPoints(lockType, copiedSelectedPoints)
+                    }
+                }
+
+            }
+    ```
+
+
 
 #### 3.0. Hierarchical relation of pattern points instance
 ![Comprehension image](screenshots/dia1.png)
@@ -226,6 +237,7 @@ patternLockView.apply {
 This can be available in only kotlin
 ```
 patternLockView.apply {
+    useInsideManagementAlgorithm = true // if you got error(such as O.o.M. error) or felt that app is not instantly responding, turn it off(switch state to false)
     onCalculateCustomShapePositionListener =
         object : PatternLockView.OnCalculateCustomShapePositionListener {
             override fun onCalculateCustomShape(
