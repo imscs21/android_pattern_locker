@@ -963,10 +963,10 @@ class PatternLockView : View ,View.OnTouchListener {
                             group_ids.binarySearch(pivotID2,defaultComparator, fromIndex = i+1) ,
                                 group_ids.binarySearch(pivotID3,defaultComparator, fromIndex = i+1),
                             group_ids.binarySearch(pivotID4,defaultComparator, fromIndex = i+1),
-                                    group_ids.binarySearch(pivotID5,defaultComparator, fromIndex = 0),
-                        group_ids.binarySearch(pivotID6,defaultComparator, fromIndex = 0),
-                                group_ids.binarySearch(pivotID7,defaultComparator, fromIndex = 0),
-                            group_ids.binarySearch(pivotID8,defaultComparator, fromIndex = 0),
+                                    //group_ids.binarySearch(pivotID5,defaultComparator, fromIndex = 0),
+                        //group_ids.binarySearch(pivotID6,defaultComparator, fromIndex = 0),
+                          //      group_ids.binarySearch(pivotID7,defaultComparator, fromIndex = 0),
+                           // group_ids.binarySearch(pivotID8,defaultComparator, fromIndex = 0),
 
                             )
                         if(useExtendedArea){
@@ -1560,11 +1560,11 @@ class PatternLockView : View ,View.OnTouchListener {
             //canvas.drawPath(outerPaths,tmpPaint)
         }
     }
-/*
+
     public fun doInitPts4InstTest():Int{
         initializePointsBy(Canvas(Bitmap.createBitmap((dip1*1000).toInt(),(dip1*2500).toInt(),Bitmap.Config.ALPHA_8)),lockType)
         return getTotalNumberOfPatternPoints()
-    }*/
+    }
 
     /**
      * initialize positions of pattern points by lockType
