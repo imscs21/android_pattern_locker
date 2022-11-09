@@ -854,7 +854,7 @@ class PatternLockView : View ,View.OnTouchListener {
                      *          about 8s in total test
                      *
                      *      o. With 3000000 random points
-                     *          out of memory error in test environment
+                     *          out of memory error(due to memory limitation in test env) in test environment
                      *
                      *
                      *  2. In (10000dp X 25000dp) size canvas
@@ -889,7 +889,7 @@ class PatternLockView : View ,View.OnTouchListener {
                      *          not occured error,but it's over 2minutes in total test
                      *
                      *      m. With 100000 random points
-                     *          out of memory error in test environment
+                     *          out of memory error (due to memory limitation in test env) in test environment
                      */
 
                     val point_radius = pointRadius
