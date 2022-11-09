@@ -764,9 +764,9 @@ class PatternLockView : View ,View.OnTouchListener {
         if(doClearPoints) {
             points.clear()
         }
-        val maxPointSize = 10000
+        val maxPointSize = (Int.MAX_VALUE-2)/2
         val doCheckBoundary = true
-        val useInnerManagementAlgorithm = useCheckAlgorithmInCustomShape//true //disabled in rc0
+        val useInsideManagementAlgorithm = useCheckAlgorithmInCustomShape
         onCalculateCustomShapePositionListener?.let {
             it.onCalculateCustomShape(canvasHeight = canvas.height,
                 canvasWidth = canvas.width,
@@ -780,7 +780,7 @@ class PatternLockView : View ,View.OnTouchListener {
             )
             if(points.size>2*maxPointSize){
                 val tmp = ArrayList<PointItem>()
-                for(i in 0 until maxPointSize){
+                for(i in 0 until min(maxPointSize,points.size)){
                     tmp.add(points[i])
                 }
                 points = tmp
@@ -804,11 +804,97 @@ class PatternLockView : View ,View.OnTouchListener {
                 points.addAll(tmp)
 
             }
-            if(useInnerManagementAlgorithm){//it will be spent more time if enabled
+            if(useInsideManagementAlgorithm){//it will be spent more time if enabled
                 val useStableAlgorithm = true
-                if(useStableAlgorithm){//it may spend more and more time in specific cases, but it will be stable and no errors
+                if(useStableAlgorithm){//it may spend more and more time in specific cases, but it will be stable and be able to have no errors
+                    /**
+                     * This Algorithm test result:
+                     *  total test. means running PatternLockViewInstTest(contained purely adding points time) class in device , not mean only this algorithm block
+                     *  1. In (1000dp X 1500dp) size canvas
+                     *      a. With 10 random points
+                     *          70ms in total test
+                     *
+                     *      b. With 50 random points
+                     *          67ms in total test
+                     *
+                     *      c. With 100 random points
+                     *          52ms in total test
+                     *
+                     *      d. With 500 random points
+                     *          130ms in total test
+                     *
+                     *      e. With 1000 random points
+                     *          174ms in total test
+                     *
+                     *      f. With 2000 random points
+                     *          270ms in total test
+                     *
+                     *      g. With 5000 random points
+                     *          812ms in total test
+                     *
+                     *      h. With 10000 random points
+                     *          about 1s in total test
+                     *
+                     *      i. With 50000 random points
+                     *          about 2s in total test
+                     *
+                     *      j. With 100000 random points
+                     *          about 2s in total test
+                     *
+                     *      k. With 500000 random points
+                     *          about 2s in total test
+                     *
+                     *      l. With 1000000 random points
+                     *          about 4s in total test
+                     *
+                     *      m. With 2000000 random points
+                     *          about 6s in total test
+                     *
+                     *      n. With 2500000 random points
+                     *          about 8s in total test
+                     *
+                     *      o. With 3000000 random points
+                     *          out of memory error in test environment
+                     *
+                     *
+                     *  2. In (10000dp X 25000dp) size canvas
+                     *      a. With 10 random points
+                     *          51 in total test
+                     *
+                     *      b. With 50 random points
+                     *          74ms in total test
+                     *
+                     *      c. With 100 random points
+                     *          81ms in total test
+                     *
+                     *      d. With 500 random points
+                     *          104ms in total test
+                     *
+                     *      e. With 1000 random points
+                     *          142ms in total test
+                     *
+                     *      f. With 2000 random points
+                     *          368ms in total test
+                     *
+                     *      g. With 5000 random points
+                     *           about 1s in total test
+                     *
+                     *      i. With 10000 random points
+                     *          about 5~6s in total test
+                     *
+                     *      k. With 30000 random points
+                     *          1m 13second in total test
+                     *
+                     *      l. With 50000 random points
+                     *          not occured error,but it's over 2minutes in total test
+                     *
+                     *      m. With 100000 random points
+                     *          out of memory error in test environment
+                     */
+
                     val point_radius = pointRadius
-                    val divideUnit =  2/*sqrt(2)+theta*/*(point_radius)+1
+                    val divideUnit =  2*(point_radius)+0.000001f
+                    val checkRadius = 2.0f*pointRadius
                     val groups = points.groupBy{
                         val item = it.second
 
@@ -827,7 +913,7 @@ class PatternLockView : View ,View.OnTouchListener {
                                      item2.first,
                                      item2.second,
                                      item1,
-                                     2.01f*pointRadius
+                                        checkRadius
                                 )){
                                    ok = false
                                     break
@@ -850,7 +936,9 @@ class PatternLockView : View ,View.OnTouchListener {
                             }
                         }
                     }
+
                     val group_ids =_group_ids.sortedWith(defaultComparator)
+
                     val tmpTotList = ArrayList<PointItem>()
                     for(i in 0 until group_ids.size-1){
                         val pivotID = group_ids[i]
@@ -909,6 +997,7 @@ class PatternLockView : View ,View.OnTouchListener {
                         }
                         val distinctSearchableList = searchableList.toHashSet()
                         val filteredPointList = ArrayList<PointItem>()
+
                         for(pPoint in pivotPointList){
                             var ok = true
                             for(id in distinctSearchableList){
@@ -919,13 +1008,11 @@ class PatternLockView : View ,View.OnTouchListener {
                                     continue
                                 }
                                 val tmpID1 = group_ids[id]
-                                //if(abs(tmpID1.first-pivotID.first)>4 || abs(tmpID1.second-pivotID.second)>4){continue }
+                                //if(abs(tmpID1.first-pivotID.first)>4 && abs(tmpID1.second-pivotID.second)>4){continue }
                                 val tmpList = groups_with_filtered_content.get(tmpID1)!!
                                 for(j in tmpList.indices){
                                     val tmpItem2 = tmpList[j].second
-                                    if(
-
-                                        calculateArea(tmpItem2.first,tmpItem2.second,pPoint.second,2.01f*pointRadius)){
+                                    if(calculateArea(tmpItem2.first,tmpItem2.second,pPoint.second,checkRadius)){
                                         ok = false
                                         break
                                     }
@@ -949,9 +1036,33 @@ class PatternLockView : View ,View.OnTouchListener {
                     }
                 }
                 else{
+                    /*
+                    //In (1000dp X 2500dp) Canvas
+                    // With 500000 random points
+                    //      elapsed 6minutes 22s(382seconds) in test environment
+                    // but algorithm in useStableAlgorithm flag is elapsed just 2s in same test environment
+                    val tmpList = ArrayList<PointItem>()
+                    for(i in points.indices){
+                        val item = points[i].second
+                        var hasDup = false
+                        for(j in i+1 until points.size){
+                            val item2 = points[j].second
+                            if(calculateArea(item2.first,item2.second,item,2*pointRadius)){
+                                hasDup = true
+                                break
+                            }
+                        }
+                        if(!hasDup){
+                            tmpList.add(points[i])
+                        }
+                    }
+                    points.clear()
+                    points = tmpList
+                    */
+
                 try{
                 val point_radius = pointRadius
-                val divideUnit = point_radius/2+1
+                val divideUnit = point_radius+1
                 val checkBetweenTwoLists:(List<PointItem>,List<PointItem>)->(Boolean) =  { x1,x2->
                     var result = true
                     var canContinueCheck = true
@@ -1095,7 +1206,7 @@ class PatternLockView : View ,View.OnTouchListener {
                 }catch(e:Exception){
 
                 }
-            }
+                }
             }
 
         }
@@ -1346,7 +1457,7 @@ class PatternLockView : View ,View.OnTouchListener {
                 val py = ((sin(Math.toRadians(i+0.0)).toFloat())*radius)+yOffset
                 val px = ((cos(Math.toRadians(i+0.0)).toFloat())*radius)+xOffset
                 /**
-                 * position of inner point
+                 * position of middle point
                  */
                 val py2 = ((sin(Math.toRadians(((i)%360)+0.0)).toFloat())*((2*radius)/3))+yOffset
                 val px2 = ((cos(Math.toRadians(((i)%360)+0.0)).toFloat())*((2*radius)/3))+xOffset
@@ -1449,7 +1560,7 @@ class PatternLockView : View ,View.OnTouchListener {
             //canvas.drawPath(outerPaths,tmpPaint)
         }
     }
-    /*
+/*
     public fun doInitPts4InstTest():Int{
         initializePointsBy(Canvas(Bitmap.createBitmap((dip1*1000).toInt(),(dip1*2500).toInt(),Bitmap.Config.ALPHA_8)),lockType)
         return getTotalNumberOfPatternPoints()

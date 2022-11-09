@@ -47,7 +47,7 @@ class PatternLockViewInstTest {
                     isPointContainerClearedBeforeThisMethod: Boolean,
                     customParams: Any?
                 ) {
-                    val tmp_size = 2500000
+                    val tmp_size = 500000//2 500 000
                     val xposes = FloatArray(tmp_size,{Random.nextInt(0,canvasWidth).toFloat()})
                     val yposes = FloatArray(tmp_size,{Random.nextInt(0,canvasHeight).toFloat()})
                     for(i in xposes.indices){
