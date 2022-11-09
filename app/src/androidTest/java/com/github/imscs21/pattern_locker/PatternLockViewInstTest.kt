@@ -47,9 +47,9 @@ class PatternLockViewInstTest {
                     isPointContainerClearedBeforeThisMethod: Boolean,
                     customParams: Any?
                 ) {
-                    val tmp_size = 5000
-                    val xposes = FloatArray(tmp_size,{random.nextInt(0,canvasWidth).toFloat()})
-                    val yposes = FloatArray(tmp_size,{random.nextInt(0,canvasHeight).toFloat()})
+                    val tmp_size = 2500000
+                    val xposes = FloatArray(tmp_size,{Random.nextInt(0,canvasWidth).toFloat()})
+                    val yposes = FloatArray(tmp_size,{Random.nextInt(0,canvasHeight).toFloat()})
                     for(i in xposes.indices){
                         pointsOfPatternContainer.add(PointItem(i, Position(xposes[i],yposes[i])))
                     }
@@ -69,6 +69,11 @@ class PatternLockViewInstTest {
             setLockTypes(PatternLockView.LockType.CUSTOM)
         }
         patternLockView.invalidate()
+        val listsize = -1//patternLockView.doInitPts4InstTest()
+        val dupcount = patternLockView.getDupPointCount()
+        Assert.assertNotEquals(0,listsize)
+        Assert.assertTrue("all points are duplicated",listsize>dupcount)
+        Assert.assertEquals(0,dupcount)
         //Assert.assertEquals(123,random.nextInt(0,500))
         //Assert.assertEquals(4000,patternLockView.doInitPts4InstTest())
         //Assert.assertEquals(4000,patternLockView.getTotalNumberOfPatternPoints())
