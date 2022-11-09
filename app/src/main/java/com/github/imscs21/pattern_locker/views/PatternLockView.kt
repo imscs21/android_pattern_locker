@@ -1561,7 +1561,7 @@ class PatternLockView : View ,View.OnTouchListener {
         }
     }
 
-    public fun doInitPts4InstTest():Int{
+    private fun doInitPts4InstTest():Int{
         initializePointsBy(Canvas(Bitmap.createBitmap((dip1*1000).toInt(),(dip1*2500).toInt(),Bitmap.Config.ALPHA_8)),lockType)
         return getTotalNumberOfPatternPoints()
     }
