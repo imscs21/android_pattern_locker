@@ -4,7 +4,6 @@ import android.graphics.Canvas
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import com.github.imscs21.pattern_locker.views.PatternLockView
-import com.github.imscs21.pattern_locker.views.PatternLockerDataController
 import org.junit.Assert
 import org.junit.Before
 import org.junit.Test
@@ -34,7 +33,19 @@ class PatternLockViewInstTest {
         patternLockView = xmlView as PatternLockView
         val random = Random(Random.nextInt(0,999999))
         patternLockView.apply {
+            val mgmtConfig = newDefaultInsideManagementConfig()
+            mgmtConfig.apply{
+                useCheckAlgorithmInCustomShape = true
+                withAroundArea = false
+                maxPointSize = (Int.MAX_VALUE-2)/2
+                useCheckingBoundary = true
+                useExtendedArea = false
+                useFastAlgorithmIfEnabled = true
+                useCollectingTruncatedPoints = false
+                useFilterPointsByCount = true
+            }
 
+            customShapeConfig = PatternLockView.CustomShapeConfig(
             onCalculateCustomShapePositionListener = object:PatternLockView.OnCalculateCustomShapePositionListener{
                 override fun onCalculateCustomShape(
                     canvasWidth: Int,
@@ -47,7 +58,8 @@ class PatternLockViewInstTest {
                     isPointContainerClearedBeforeThisMethod: Boolean,
                     customParams: Any?
                 ) {
-                    val tmp_size = 500000//2 500 000
+                    val tmp_size = 2500000//2 500 000
+
                     val xposes = FloatArray(tmp_size,{Random.nextInt(0,canvasWidth).toFloat()})
                     val yposes = FloatArray(tmp_size,{Random.nextInt(0,canvasHeight).toFloat()})
                     for(i in xposes.indices){
@@ -59,7 +71,9 @@ class PatternLockViewInstTest {
                 override fun getSpacingCount(): Int {
                     return 10
                 }
-            }
+            },
+                mgmtConfig
+                )
             /*onFinishInitializePoints = object:PatternLockView.OnFinishInitializePoints{
                 override fun onFinished(view: PatternLockView) {
                     Assert.assertEquals(4000,patternLockView.getTotalNumberOfPatternPoints())
@@ -69,11 +83,13 @@ class PatternLockViewInstTest {
             setLockTypes(PatternLockView.LockType.CUSTOM)
         }
         patternLockView.invalidate()
-        val listsize = -1//patternLockView.doInitPts4InstTest()
+        val listsize =  -1//patternLockView.doInitPts4InstTest()
         val dupcount = patternLockView.getDupPointCount()
         Assert.assertNotEquals(0,listsize)
         Assert.assertTrue("all points are duplicated",listsize>dupcount)
+        //Assert.assertEquals(4,patternLockView.around_area_count)
         Assert.assertEquals(0,dupcount)
+
         //Assert.assertEquals(123,random.nextInt(0,500))
         //Assert.assertEquals(4000,patternLockView.doInitPts4InstTest())
         //Assert.assertEquals(4000,patternLockView.getTotalNumberOfPatternPoints())

@@ -1,7 +1,6 @@
 package com.github.imscs21.pattern_locker.views
 
 import android.content.*
-import android.content.pm.PackageManager
 import android.content.res.TypedArray
 import android.graphics.Canvas
 import android.util.AttributeSet
@@ -9,16 +8,8 @@ import android.util.TypedValue
 import android.view.*
 import android.graphics.*
 import android.os.*
-import android.widget.Toast
-import androidx.core.content.PackageManagerCompat
-import androidx.core.os.ExecutorCompat
 import com.github.imscs21.pattern_locker.R
-import com.github.imscs21.pattern_locker.utils.ThreadLockerPackage
 import com.github.imscs21.pattern_locker.utils.VibrationUtil
-import kotlinx.coroutines.selects.select
-import java.util.PriorityQueue
-import java.util.concurrent.Executor
-import java.util.concurrent.locks.Lock
 import kotlin.math.*
 
 /**
@@ -74,6 +65,87 @@ class PatternLockView : View ,View.OnTouchListener {
         public fun getSpacingCount():Int
 
     }
+
+    /**
+     * config behavior for management of custom shape
+     */
+    public open class CustomShapeInsideManagementConfig(
+        var useCheckAlgorithmInCustomShape:Boolean,
+
+        protected val divideUnitFunc:()->(Float),
+        protected val checkRadiusFunc:()->(Float),
+
+        val truncatedPointsContainer:ArrayList<PointItem> = ArrayList<PointItem>(),
+
+        var withAroundArea:Boolean = false,
+        var maxPointSize:Int = (Int.MAX_VALUE-2)/2,
+        var useCheckingBoundary:Boolean = true,
+        var useExtendedArea:Boolean = false,
+        var useFastAlgorithmIfEnabled:Boolean = true,
+        var useCollectingTruncatedPoints:Boolean = false,//default is false(disabled) due to device memory usage problem
+        var useFilterPointsByCount:Boolean = true
+    ){
+        /**
+         * get grid group boundary size
+         */
+        public fun getDivideUnit():Float{
+            return max(1f,divideUnitFunc())
+        }
+
+        /**
+         * get dup area size
+         */
+        public fun getCheckRadius():Float{
+            return checkRadiusFunc()
+        }
+    }
+    /**
+     * default config behavior for management of custom shape
+     */
+    public open class BasicCustomShapeInsideManagementConfig
+        (protected val pointRadius: Float)
+        :
+        CustomShapeInsideManagementConfig(
+            useCheckAlgorithmInCustomShape = true,
+            divideUnitFunc = {
+                2*pointRadius+0.000001f
+            },
+            checkRadiusFunc = {
+                2*pointRadius
+            },
+             withAroundArea = false,
+             maxPointSize = (Int.MAX_VALUE-2)/2,
+             useCheckingBoundary = true,
+             useExtendedArea = false,
+             useFastAlgorithmIfEnabled = true,
+            useCollectingTruncatedPoints = false,
+            useFilterPointsByCount = true
+    ){
+
+    }
+    protected inner class DefaultCustomShapeInsideManagementConfig
+        :BasicCustomShapeInsideManagementConfig(pointRadius)
+        {
+
+    }
+
+    public fun newDefaultInsideManagementConfig():CustomShapeInsideManagementConfig{
+        return DefaultCustomShapeInsideManagementConfig()
+    }
+
+    /**
+     * custom shape config wrapper
+     */
+    public data class CustomShapeConfig(
+        var onCalculateCustomShapePositionListener:OnCalculateCustomShapePositionListener? = null,
+        var customShapeInsideManagementConfig: CustomShapeInsideManagementConfig
+    ){
+
+    }
+
+    /**
+     * callback listener after finishing initialized position of pattern points
+     */
     public interface OnFinishInitializePoints{
         public fun onFinished(view:PatternLockView)
     }
@@ -140,12 +212,15 @@ class PatternLockView : View ,View.OnTouchListener {
     /**
      * listener property for calculating custom shape when selecting custom lock type
      */
+    @Deprecated("Currently Moved function",ReplaceWith("customShapeConfig"))
     public var onCalculateCustomShapePositionListener:OnCalculateCustomShapePositionListener? = null
 
     /**
      * listener property for turning off error indicator
      */
     public var onTurnOffErrorIndicatorListener:OnTurnOffErrorIndicatorListener? = null
+
+    public var customShapeConfig:CustomShapeConfig? = null
 
     /**
      * flag that checking abnormal judgement padding size for other developer`s mistakes
@@ -462,6 +537,45 @@ class PatternLockView : View ,View.OnTouchListener {
         setAttrs(context, attrs, defStyle)
     }
 
+    private final fun checkAndSetDefaultCustomShapeConfig():CustomShapeConfig?{
+        customShapeConfig?.let{
+            if(it.onCalculateCustomShapePositionListener==null){
+                it.onCalculateCustomShapePositionListener = onCalculateCustomShapePositionListener
+            }
+        }
+            ?:run{
+                customShapeConfig = CustomShapeConfig(onCalculateCustomShapePositionListener = onCalculateCustomShapePositionListener,
+                DefaultCustomShapeInsideManagementConfig()
+                    )
+            }
+        return customShapeConfig
+    }
+    public fun setPointRadius(value:Float,invalidateView: Boolean = true){
+        pointRadius = value
+
+        if(shouldRecalculateSize){
+            mainHandler.post{
+                try{
+                    requestLayout()
+                }
+                catch(e:Exception){
+
+                }
+            }
+        }
+
+        if(invalidateView){
+            mainHandler.post {
+                try{
+                    invalidate()
+                }catch(e:Exception){
+
+                }
+            }
+        }
+
+    }
+
     protected final fun getColorIntFromInt(colorInt:Int):Int{
         val a = Color.alpha(colorInt)
         val r = Color.red(colorInt)
@@ -636,8 +750,15 @@ class PatternLockView : View ,View.OnTouchListener {
                 8
             }
             LockType.CUSTOM->{
-                onCalculateCustomShapePositionListener?.let{
-                    max(1,it.getSpacingCount())
+                checkAndSetDefaultCustomShapeConfig()
+                customShapeConfig?.let{
+
+                    max(1,it.onCalculateCustomShapePositionListener?.let{
+                        it.getSpacingCount()
+                    }
+                        ?:run{
+                            1
+                        })
                 }
                     ?:run{
                         1
@@ -754,6 +875,7 @@ class PatternLockView : View ,View.OnTouchListener {
         }
         return result
     }
+    //public var around_area_count = 0//use for test
     /**
      * initialize [points] and calculate positions of pattern points as developer custom shape pattern
      * @param canvas [Canvas] class to obtain canvas width and height
@@ -763,11 +885,16 @@ class PatternLockView : View ,View.OnTouchListener {
         val doClearPoints = true
         if(doClearPoints) {
             points.clear()
+            resetSelectedPoints(force=true,invalidateView = false)
         }
-        val maxPointSize = (Int.MAX_VALUE-2)/2
-        val doCheckBoundary = true
-        val useInsideManagementAlgorithm = useCheckAlgorithmInCustomShape
-        onCalculateCustomShapePositionListener?.let {
+
+        checkAndSetDefaultCustomShapeConfig()
+
+        customShapeConfig?.let{config->
+            val useInsideManagementAlgorithm = config.customShapeInsideManagementConfig.useCheckAlgorithmInCustomShape
+            val maxPointSize = config.customShapeInsideManagementConfig.maxPointSize //(Int.MAX_VALUE-2)/2
+            val doCheckBoundary = config.customShapeInsideManagementConfig.useCheckingBoundary//true
+        config.onCalculateCustomShapePositionListener?.let {
             it.onCalculateCustomShape(canvasHeight = canvas.height,
                 canvasWidth = canvas.width,
                 directCanvas = null,
@@ -778,15 +905,31 @@ class PatternLockView : View ,View.OnTouchListener {
                 isPointContainerClearedBeforeThisMethod = doClearPoints,
                 customParams = null
             )
-            if(points.size>2*maxPointSize){
-                val tmp = ArrayList<PointItem>()
-                for(i in 0 until min(maxPointSize,points.size)){
-                    tmp.add(points[i])
-                }
-                points = tmp
-            }else{
-                while(points.size>maxPointSize){
-                    points.removeLast()
+            if(config.customShapeInsideManagementConfig.useFilterPointsByCount){
+                if(points.size.toLong()>2*maxPointSize.toLong()){
+                    val tmpList = ArrayList<PointItem>()
+                    while(tmpList.size<=maxPointSize){
+                        val tmp = points.removeFirstOrNull()
+                        if(tmp==null){
+                            break
+                        }
+                        else{
+                            tmpList.add(tmp!!)
+                        }
+                    }
+                    if(config.customShapeInsideManagementConfig.useCollectingTruncatedPoints){
+                        config.customShapeInsideManagementConfig.truncatedPointsContainer.addAll(points)
+
+                    }
+                    points.clear()
+                    points = tmpList
+                }else{
+                    while(points.size>maxPointSize){
+                        val tmp = points.removeLast()
+                        if(tmp!=null&&config.customShapeInsideManagementConfig.useCollectingTruncatedPoints){
+                            config.customShapeInsideManagementConfig.truncatedPointsContainer.add(tmp)
+                        }
+                    }
                 }
             }
             if(doCheckBoundary){//it takes more time
@@ -798,6 +941,11 @@ class PatternLockView : View ,View.OnTouchListener {
                     ){
                         return@filter true
                     }
+                    config.customShapeInsideManagementConfig.let{ mgmtconfig->
+                        if(mgmtconfig.useCollectingTruncatedPoints){
+                            mgmtconfig.truncatedPointsContainer.add(it)
+                        }
+                    }
                     return@filter false
                 }
                 points.clear()
@@ -805,8 +953,9 @@ class PatternLockView : View ,View.OnTouchListener {
 
             }
             if(useInsideManagementAlgorithm){//it will be spent more time if enabled
-                val useStableAlgorithm = true
-                if(useStableAlgorithm){//it may spend more and more time in specific cases, but it will be stable and be able to have no errors
+                val useFastStableAlgorithm = config.customShapeInsideManagementConfig.useFastAlgorithmIfEnabled
+
+                if(useFastStableAlgorithm){//it may spend more and more time in specific cases, but it will be stable and be able to have no errors
                     /**
                      * This Algorithm test result:
                      *  total test. means running PatternLockViewInstTest(contained purely adding points time) class in device , not mean only this algorithm block
@@ -854,12 +1003,12 @@ class PatternLockView : View ,View.OnTouchListener {
                      *          about 8s in total test
                      *
                      *      o. With 3000000 random points
-                     *          out of memory error in test environment
+                     *          out of memory error(due to memory limitation in test env) in test environment
                      *
                      *
                      *  2. In (10000dp X 25000dp) size canvas
                      *      a. With 10 random points
-                     *          51 in total test
+                     *          51ms in total test
                      *
                      *      b. With 50 random points
                      *          74ms in total test
@@ -889,12 +1038,13 @@ class PatternLockView : View ,View.OnTouchListener {
                      *          not occured error,but it's over 2minutes in total test
                      *
                      *      m. With 100000 random points
-                     *          out of memory error in test environment
+                     *          out of memory error (due to memory limitation in test env) in test environment
                      */
-
+                    val useExtendedArea = config.customShapeInsideManagementConfig.useExtendedArea
+                    val withAroundArea = config.customShapeInsideManagementConfig.withAroundArea
                     val point_radius = pointRadius
-                    val divideUnit =  2*(point_radius)+0.000001f
-                    val checkRadius = 2.0f*pointRadius
+                    val divideUnit =  config.customShapeInsideManagementConfig.getDivideUnit()
+                    val checkRadius = config.customShapeInsideManagementConfig.getCheckRadius()
                     val groups = points.groupBy{
                         val item = it.second
 
@@ -916,11 +1066,15 @@ class PatternLockView : View ,View.OnTouchListener {
                                         checkRadius
                                 )){
                                    ok = false
+
                                     break
                                 }
                             }
                             if(ok){
                                 tmp.add(pvt[i])
+                            }
+                            else if(config.customShapeInsideManagementConfig.useCollectingTruncatedPoints){
+                                config.customShapeInsideManagementConfig.truncatedPointsContainer.add(pvt[i])
                             }
                         }
                         groups_with_filtered_content.put(k,tmp.toList())
@@ -956,43 +1110,70 @@ class PatternLockView : View ,View.OnTouchListener {
 
 
                         val pivotID8 = Pair<Int,Int>(pivotID.first,pivotID.second-increment)
-                        val useExtendedArea = false
+
 
                         val searchableList = arrayListOf(
                             group_ids.binarySearch(pivotID1,defaultComparator, fromIndex = i+1),
                             group_ids.binarySearch(pivotID2,defaultComparator, fromIndex = i+1) ,
                                 group_ids.binarySearch(pivotID3,defaultComparator, fromIndex = i+1),
                             group_ids.binarySearch(pivotID4,defaultComparator, fromIndex = i+1),
-                                    group_ids.binarySearch(pivotID5,defaultComparator, fromIndex = 0),
-                        group_ids.binarySearch(pivotID6,defaultComparator, fromIndex = 0),
-                                group_ids.binarySearch(pivotID7,defaultComparator, fromIndex = 0),
-                            group_ids.binarySearch(pivotID8,defaultComparator, fromIndex = 0),
-
                             )
+                        if(withAroundArea){
+                            val tmp = listOf(group_ids.binarySearch(pivotID5,defaultComparator, fromIndex = 0),
+                                group_ids.binarySearch(pivotID6,defaultComparator, fromIndex = 0),
+                                      group_ids.binarySearch(pivotID7,defaultComparator, fromIndex = 0),
+                                 group_ids.binarySearch(pivotID8,defaultComparator, fromIndex = 0),)
+                            searchableList.addAll(tmp)
+                        }
+
                         if(useExtendedArea){
-                            increment++
-                            val pivotID9 = Pair<Int,Int>(pivotID.first,pivotID.second+increment)
+                            increment+=1//2
 
-                            val pivotID10 = Pair<Int,Int>(pivotID.first+increment,pivotID.second+increment)
-                            val pivotID11 = Pair<Int,Int>(pivotID.first+increment,pivotID.second)
-                            val pivotID12 = Pair<Int,Int>(pivotID.first+increment,pivotID.second-increment)
-
-                            val pivotID13 = Pair<Int,Int>(pivotID.first-increment,pivotID.second-increment)
-                            val pivotID14 = Pair<Int,Int>(pivotID.first-increment,pivotID.second+increment)
-                            val pivotID15 = Pair<Int,Int>(pivotID.first-increment,pivotID.second)
-
-
-                            val pivotID16 = Pair<Int,Int>(pivotID.first,pivotID.second-increment)
-                            val extendedIds = arrayOf(
+                            val pivotID9 = Pair<Int,Int>(pivotID.first+increment,pivotID.second+increment)
+                            val pivotID10 = Pair<Int,Int>(pivotID.first+increment,pivotID.second-increment)
+                            val pivotID11 = Pair<Int,Int>(pivotID.first-increment,pivotID.second-increment)
+                            val pivotID12 = Pair<Int,Int>(pivotID.first-increment,pivotID.second+increment)
+                            val extendedIds = arrayListOf(
                                 group_ids.binarySearch(pivotID9,defaultComparator, fromIndex = i+1),
                                 group_ids.binarySearch(pivotID10,defaultComparator, fromIndex = i+1) ,
-                                group_ids.binarySearch(pivotID11,defaultComparator, fromIndex = i+1),
-                                group_ids.binarySearch(pivotID12,defaultComparator, fromIndex = i+1),
-                                group_ids.binarySearch(pivotID13,defaultComparator, fromIndex = 0),
-                                group_ids.binarySearch(pivotID14,defaultComparator, fromIndex = 0),
-                                group_ids.binarySearch(pivotID15,defaultComparator, fromIndex = 0),
-                                group_ids.binarySearch(pivotID16,defaultComparator, fromIndex = 0)
+                                group_ids.binarySearch(pivotID11,defaultComparator, fromIndex = 0),
+                                group_ids.binarySearch(pivotID12,defaultComparator, fromIndex = 0),
                             )
+                            for(k in -1 .. 1 step 2) {
+                                for (incre in -increment + 1..increment - 1) {
+
+                                    val tmpid1 = Pair<Int, Int>(
+                                        pivotID.first + incre,
+                                        pivotID.second + k * increment
+                                    )
+                                    val tmpid2 = Pair<Int, Int>(
+                                        pivotID.first + k * increment,
+                                        pivotID.second + incre
+                                    )
+                                    for(tmp in listOf(tmpid1,tmpid2)){
+                                        tmp.let{
+                                            if((it.first>pivotID.first)||(it.first==pivotID.first&&it.second>pivotID.second)){
+                                                extendedIds.add(group_ids.binarySearch(it,defaultComparator, fromIndex = i+1))
+                                            }
+                                            else{
+                                                if(withAroundArea) {
+                                                    extendedIds.add(
+                                                        group_ids.binarySearch(
+                                                            it,
+                                                            defaultComparator,
+                                                            fromIndex = 0
+                                                        )
+                                                    )
+                                                }
+                                                else{
+
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                            //around_area_count = extendedIds.size//for test
                             searchableList.addAll(extendedIds)
                         }
                         val distinctSearchableList = searchableList.toHashSet()
@@ -1021,6 +1202,9 @@ class PatternLockView : View ,View.OnTouchListener {
                             if(ok){
                                 filteredPointList.add(pPoint)
                             }
+                            else if(config.customShapeInsideManagementConfig.useCollectingTruncatedPoints){
+                                config.customShapeInsideManagementConfig.truncatedPointsContainer.add(pPoint)
+                            }
                         }
                         groups_with_filtered_content.put(pivotID,filteredPointList)
                     }
@@ -1036,7 +1220,7 @@ class PatternLockView : View ,View.OnTouchListener {
                     }
                 }
                 else{
-                    /*
+
                     //In (1000dp X 2500dp) Canvas
                     // With 500000 random points
                     //      elapsed 6minutes 22s(382seconds) in test environment
@@ -1058,162 +1242,17 @@ class PatternLockView : View ,View.OnTouchListener {
                     }
                     points.clear()
                     points = tmpList
-                    */
-
-                try{
-                val point_radius = pointRadius
-                val divideUnit = point_radius+1
-                val checkBetweenTwoLists:(List<PointItem>,List<PointItem>)->(Boolean) =  { x1,x2->
-                    var result = true
-                    var canContinueCheck = true
-                    for(i in x1.indices){
-                        val item1 = x1[i].second
-                        for(j in x2.indices){
-                            val item2 = x2[j].second
-                            if(!calculateArea(item2.first,item2.second,item1,point_radius)){
-                                canContinueCheck = false
-                                 result = false
-                                break
-                            }
-                        }
-                        if(!canContinueCheck){
-                            break
-                        }
-                    }
-                     result
-                }
-                val searchSecond:(List<PointItem>)->(ArrayList<PointItem>)= {
-                    val group2 = it.groupBy { (it.second.first/divideUnit).toInt() }
-                    val _group_ids2 = group2.keys.toList()
-                    val group_ids2 = _group_ids2.sortedBy { it }
-                    val tmp_list = ArrayList<PointItem>()
-                    var previous_group:List<PointItem>? = group2.get(group_ids2[0])!!
-                    if(group_ids2.size>1) {
-                        previous_group = null
-                        tmp_list.clear()
-                        previous_group = group2.get(group_ids2[0])!!
-                        for (k in 1 until group_ids2.size) {
-
-                            val current_group = group2.get(group_ids2[k])!!
-
-                            previous_group = previous_group!!.filter {
-                                var cnt = 0
-                                val item1 = it.second
-                                for (j in current_group.indices) {
-                                    val item2 = current_group[j].second
-                                    if (calculateArea(
-                                            item2.first,
-                                            item2.second,
-                                            item1,
-                                            2*pointRadius
-                                        )
-                                    ) {
-                                        cnt++
-                                    }
-                                }
-                                cnt == 0
-                            }
-                            previous_group?.let{tmp_list.addAll(it)}
-
-                            previous_group = current_group
-                        }
-                        previous_group?.let {
-                            tmp_list.addAll(it)
-                        }
-                    }
-
-                    else if(group_ids2.size==1){
-                        val grp = group2.get(group_ids2[0])!!
-                        for(i in grp.indices){
-                            var cnt = 0
-                            val item1 = grp[i].second
-                            for(j in i+1 until grp.size){
-                                val item2 = grp[j].second
-                                if (calculateArea(
-                                        item2.first,
-                                        item2.second,
-                                        item1,
-                                        point_radius
-                                    )
-                                ) {
-                                    cnt++
-                                }
-                            }
-                            if(cnt==0){
-                                tmp_list.add(grp[i])
-                            }
-                        }
-                    }
-                    else{
-                        tmp_list.addAll(it)
-                    }
-                    tmp_list
-                }
-
-                //points.sortBy { it.second.first }
-                //val point_radius = pointRadius
-
-                val group = points.groupBy { (it.second.second/divideUnit).toInt() }
-                val _group_ids = group.keys.toList()
-                val group_ids = _group_ids.sortedBy { it }
-                //points.clear()
-                if(group_ids.size>1) {
-                    val tmp_list = ArrayList<PointItem>()
-                    var previous_group:List<PointItem>? = group.get(group_ids[0])!!
-                    for (k in 1 until group_ids.size) {
-
-                        val current_group = group.get(group_ids[k])!!
-
-                        previous_group = previous_group!!.filter{
-                            var cnt = 0
-                            val item1 = it.second
-                            for(j in current_group.indices){
-                                val item2 = current_group[j].second
-                                if(calculateArea(item2.first,item2.second,item1,2*pointRadius)){
-                                    cnt++
-                                }
-                            }
-                            cnt==0
-                        }
-                        tmp_list.addAll(previous_group!!)
-
-                        previous_group = current_group
-                    }
-                    previous_group?.let{
-                        tmp_list.addAll(it)
-                    }
-                    var tmp = searchSecond(tmp_list)
-                    //points.addAll(tmp_list)
-                    tmp?.let {
-                        if(it.size>0) {
-                            points?.clear()
-                            points = it
-                        }
-                    }
-                }
-                else if(group_ids.size==1){
-                    searchSecond(group.get(group_ids[0])!!)?.let{
-                        if(it.size>0){
-                            points?.clear()
-                            points = it
-                        }
-                    }
-
-                }
-                else{
-
-                }
-                }catch(e:Exception){
-
-                }
                 }
             }
 
         }
             ?:run{
+                initalizePointsAsSquare(canvas,5)
+            }
+        }
+            ?:run{
                 initalizePointsAsSquare(canvas,3)
             }
-
     }
 
     /**
@@ -1560,11 +1599,11 @@ class PatternLockView : View ,View.OnTouchListener {
             //canvas.drawPath(outerPaths,tmpPaint)
         }
     }
-/*
-    public fun doInitPts4InstTest():Int{
+
+    private final fun doInitPts4InstTest():Int{
         initializePointsBy(Canvas(Bitmap.createBitmap((dip1*1000).toInt(),(dip1*2500).toInt(),Bitmap.Config.ALPHA_8)),lockType)
         return getTotalNumberOfPatternPoints()
-    }*/
+    }
 
     /**
      * initialize positions of pattern points by lockType
