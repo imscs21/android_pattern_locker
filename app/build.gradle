@@ -8,7 +8,7 @@ plugins {
 //apply plugin : 'com.github.dcendents.android-maven'
 group = "com.github.imscs21"
 //version code principle:
-// <biggest lib generation number>.<many or significant or big changes number>.<small or 'little big' patch(changes) or small bugs fixing number>.<number of count that try to upload> [rc<rc number in current version code>]
+// <biggest lib generation number>.<many or significant or big changes number>.<small or 'little big' patch(changes) or small bugs fixing number>[.<number of count that try to upload>] [rc<rc number in current version code>]
 version="0.3.3"
 
 android {
