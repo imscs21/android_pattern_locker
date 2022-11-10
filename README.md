@@ -21,7 +21,7 @@ Pattern Locker Library for android
 ## 1. Import this lib to your project
 1. add jitpack in your 'settings.gradle'
 
-    ```
+    ```gradle
     dependencyResolutionManagement {
         ...
         repositories {
@@ -33,9 +33,9 @@ Pattern Locker Library for android
     ```
 
 2. add dependencies in your 'app/build.gradle'
-    ```
+    ```gradle
     dependencies {
-        implementation 'com.github.imscs21:android_pattern_locker:v0.3.2.1'
+        implementation 'com.github.imscs21:android_pattern_locker:v0.3.3'
         ...
     }
     ```
@@ -44,7 +44,7 @@ Pattern Locker Library for android
 
 
 ## 2. In XML
-```
+```xml
 <com.github.imscs21.pattern_locker.views.PatternLockView
         xmlns:android="http://schemas.android.com/apk/res/android"
         xmlns:app="http://schemas.android.com/apk/res-auto"
@@ -68,7 +68,7 @@ Pattern Locker Library for android
         app:useTrajectoryLineShadow="false"
         app:patternType="hexagon_shape_default" />
 ```
-* xml attributes
+* **xml attributes**
     1. (supported) pattern types
         * square_3x3
         * square_3x3_with_checker_pattern
@@ -87,7 +87,7 @@ Pattern Locker Library for android
 
 ## 3. In Kotlin
 1. setting basic attributes in codes
-    ```
+    ```kotlin
     patternLockView.useVibratorIfAvaliable = false
     patternLockView.useTrajectoryLineShadow = false
     patternLockView.shouldShowTrajectoryLines = false
@@ -107,7 +107,7 @@ Pattern Locker Library for android
     ```
 
 2. setting controller and listeners
-    ```
+    ```kotlin
     //patternLockView = PatternLockView(context) //for initiate view in code
 
     val patternDataContoller = PatternLockerDataController.PatternLockerDataControllerFactory.getInstance().build<String>(this,PatternLockerDataController.SimpleDataStorageBehavior(this))
@@ -149,7 +149,7 @@ Pattern Locker Library for android
 
 #### 3.0. Hierarchical relation of pattern points instance
 ![Comprehension image](screenshots/dia1.png)
-```
+```kotlin
 Position = Pair<Float,Float>//x,y position values
 
 PointItem = Pair<Int,Position>//pointID(index)number,Point Position
@@ -162,7 +162,7 @@ selectedPoints = ArrayList<SelectedPointItem>
 ```
 
 #### 3.1. Implement your own pattern storage behavior
-```
+```kotlin
 val dataControllerFactory = PatternLockerDataController.PatternLockerDataControllerFactory.getInstance()
 
 val dataStorageBehavior : PatternLockerDataController.DataStorageBehavior<Any> = object:PatternLockerDataController.DataStorageBehavior<Any>{
@@ -206,7 +206,8 @@ val dataController = dataControllerFactory.build(context,dataStorageBehavior)
 #### 3.2. Simple Data Storage Behavior 
 This is pre-defined StorageBehavior.    
 But There are weak points due to md5 hashing. 
-```
+```kotlin
+//Example of DataStorageBehavior and fast simple implemention
 val simpleBehavior = PatternLockerDataController.SimpleDataStorageBehavior(this)
 val dataControllerFactory = PatternLockerDataController.PatternLockerDataControllerFactory.getInstance()
 val patternDataContoller = dataControllerFactory.build<String>(this,simpleBehavior)
@@ -214,7 +215,7 @@ val patternDataContoller = dataControllerFactory.build<String>(this,simpleBehavi
 
 #### 3.3. Implement your own index number
 
-```
+```kotlin
 patternLockView.apply {
     onCalculateCustomPointOfPatternListener = object : PatternLockView.OnCalculateCustomIndexOfPointOfPatternListener{
         override fun getPointIndex(originalIndex: Int, pointPosition: Position): Int {
@@ -235,23 +236,33 @@ patternLockView.apply {
 
 #### 3.4. Implement your own custom pattern shape
 This can be available in only kotlin
-```
+```kotlin
 patternLockView.apply {
-    useInsideManagementAlgorithm = true // if you got error(such as O.o.M. error) or felt that app is not instantly responding, turn it off(switch state to false)
-    onCalculateCustomShapePositionListener =
-        object : PatternLockView.OnCalculateCustomShapePositionListener {
-            override fun onCalculateCustomShape(
-                canvasWidth: Int,
-                canvasHeight: Int,
-                directCanvas: Canvas?,
-                pointsOfPatternContainer: ArrayList<PointItem>,
-                pointsOfPatternContainerMaxLength: UInt,
-                pointRadius: Float,
-                spacingValuesIfWrapContent: Pair<PatternLockView.SpacingTypeIfWrapContent, Float>,
-                isPointContainerClearedBeforeThisMethod: Boolean,
-                customParams: Any?
-            ) {
-                //this is example of custom shape
+    val mgmtConfig = newDefaultInsideManagementConfig()//from patternLockView.newDefaultInsideManagementConfig
+    mgmtConfig.apply{
+        useCheckAlgorithmInCustomShape = true // if you got error(such as O.o.M. error) or felt that app is not instantly responding, turn it off(switch state to false(disable))
+        withAroundArea = false
+        maxPointSize = (Int.MAX_VALUE-2)/2
+        useCheckingBoundary = true// if you got error or felt that app is not instantly responding, turn it off(switch state to false(disable))
+        useExtendedArea = false
+        useFastAlgorithmIfEnabled = true
+        useCollectingTruncatedPoints = false
+        useFilterPointsByCount = true// if you got error or felt that app is not instantly responding, turn it off(switch state to false(disable))
+    }
+
+    customShapeConfig = PatternLockView.CustomShapeConfig(
+    onCalculateCustomShapePositionListener = object:PatternLockView.OnCalculateCustomShapePositionListener{
+        override fun onCalculateCustomShape(
+            canvasWidth: Int,
+            canvasHeight: Int,
+            directCanvas: Canvas?,
+            pointsOfPatternContainer: ArrayList<PointItem>,
+            pointsOfPatternContainerMaxLength: UInt,
+            pointRadius: Float,
+            spacingValuesIfWrapContent: Pair<PatternLockView.SpacingTypeIfWrapContent, Float>,
+            isPointContainerClearedBeforeThisMethod: Boolean,
+            customParams: Any?
+        ) {
                 val cx = canvasWidth / 2.0f
                 val cy = canvasHeight / 2.0f
                 pointsOfPatternContainer.add(PointItem(1, Position(cx, cy)))
@@ -262,12 +273,16 @@ patternLockView.apply {
                         Position(canvasWidth - 5*pointRadius, cy)
                     )
                 )
-            }
-            override fun getSpacingCount(): Int {
-                        //per each axis of shape
-                        return 2
-            }
+
         }
+
+        override fun getSpacingCount(): Int {
+            //per each axis of shape
+            return 2
+        }
+    },
+        mgmtConfig
+        )
     setLockTypes(PatternLockView.LockType.CUSTOM)
 }
 ```
@@ -275,17 +290,17 @@ patternLockView.apply {
 
 
 ### 4. How to reset drawn pattern
-```
+```kotlin
 patternLockView.resetSelectedPoints(force = true,invalidateView = true)
 ```
 
 ### 5. How to reset stored pattern info
-```
+```kotlin
 patternDataContoller?.resetPattern()
 ```
 
 ### 6. How to use error indicator
-```
+```kotlin
 patternLockView.apply {
     isReadOnlyMode = true
     patternLockView.turnErrorIndicator(
